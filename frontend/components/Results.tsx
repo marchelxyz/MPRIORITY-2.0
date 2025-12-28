@@ -8,7 +8,7 @@ import HelpTooltip from './HelpTooltip'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ReactMarkdown from 'react-markdown'
-import { saveAnalysis, isStorageAvailable } from '@/lib/storage'
+import { saveAnalysis } from '@/lib/storage'
 
 interface ResultsProps {
   hierarchy: {
@@ -101,11 +101,6 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
   }
 
   const saveToHistory = async () => {
-    if (!isStorageAvailable()) {
-      alert('localStorage недоступен в вашем браузере. Сохранение невозможно.')
-      return
-    }
-
     setIsSaving(true)
     setSaveSuccess(false)
 
@@ -121,9 +116,9 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
       
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка при сохранении:', error)
-      alert('Ошибка при сохранении анализа. Попробуйте еще раз.')
+      alert(`Ошибка при сохранении анализа: ${error.message || 'Проверьте подключение к серверу'}`)
     } finally {
       setIsSaving(false)
     }
@@ -484,13 +479,13 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         <div className="flex gap-2 flex-wrap">
           <button
             onClick={saveToHistory}
-            disabled={isSaving || !isStorageAvailable()}
+            disabled={isSaving}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
               saveSuccess
                 ? 'bg-green-600 text-white'
                 : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
-            title={!isStorageAvailable() ? 'localStorage недоступен в вашем браузере' : 'Сохранить в историю'}
+            title="Сохранить в историю"
           >
             {isSaving ? (
               <>

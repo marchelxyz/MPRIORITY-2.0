@@ -224,6 +224,35 @@ app.delete('/api/analyses/:id', async (req, res) => {
   }
 });
 
+// Массовое удаление всех анализов
+app.delete('/api/analyses', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'База данных не доступна' });
+    }
+
+    // Получаем все анализы и удаляем их по одному
+    const analyses = await getAllAnalyses(1000, 0);
+    let deletedCount = 0;
+    
+    for (const analysis of analyses) {
+      const deleted = await deleteAnalysis(analysis.id);
+      if (deleted) {
+        deletedCount++;
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Удалено анализов: ${deletedCount}`,
+      deletedCount 
+    });
+  } catch (error) {
+    console.error('Ошибка при массовом удалении анализов:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 MPRIORITY 2.0 Backend running on port ${PORT}`);
 });
