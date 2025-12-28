@@ -100,7 +100,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
     URL.revokeObjectURL(url)
   }
 
-  const saveToHistory = () => {
+  const saveToHistory = async () => {
     if (!isStorageAvailable()) {
       alert('localStorage недоступен в вашем браузере. Сохранение невозможно.')
       return
@@ -110,7 +110,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
     setSaveSuccess(false)
 
     try {
-      saveAnalysis({
+      await saveAnalysis({
         goal: hierarchy.goal,
         criteria: hierarchy.criteria,
         alternatives: hierarchy.alternatives,
