@@ -2,14 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader2, Save } from 'lucide-react'
+import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader2 } from 'lucide-react'
 import HierarchyGraph from './HierarchyGraph'
 import HelpTooltip from './HelpTooltip'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ReactMarkdown from 'react-markdown'
 import html2canvas from 'html2canvas'
-import { saveAnalysis } from '@/lib/storage'
 
 interface ResultsProps {
   hierarchy: {
@@ -41,8 +40,6 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [analysisRequested, setAnalysisRequested] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveSuccess, setSaveSuccess] = useState(false)
   
   const hierarchyGraphRef = useRef<HTMLDivElement>(null)
   const barChartRef = useRef<HTMLDivElement>(null)
@@ -105,55 +102,6 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
     URL.revokeObjectURL(url)
   }
 
-  const saveToHistory = async () => {
-    setIsSaving(true)
-    setSaveSuccess(false)
-
-    try {
-      // Валидация данных перед сохранением
-      if (!hierarchy.goal || hierarchy.goal.trim() === '') {
-        throw new Error('Цель анализа не может быть пустой')
-      }
-      if (!hierarchy.criteria || hierarchy.criteria.length === 0) {
-        throw new Error('Список критериев пуст')
-      }
-      if (!hierarchy.alternatives || hierarchy.alternatives.length === 0) {
-        throw new Error('Список альтернатив пуст')
-      }
-      if (!criteriaMatrix || criteriaMatrix.length === 0) {
-        throw new Error('Матрица критериев не заполнена')
-      }
-      if (!alternativeMatrices || alternativeMatrices.length === 0) {
-        throw new Error('Матрицы альтернатив не заполнены')
-      }
-      
-      console.log('💾 Сохранение анализа:', {
-        goal: hierarchy.goal,
-        criteriaCount: hierarchy.criteria.length,
-        alternativesCount: hierarchy.alternatives.length,
-        criteriaMatrixSize: criteriaMatrix.length,
-        alternativeMatricesCount: alternativeMatrices.length
-      })
-      
-      await saveAnalysis({
-        goal: hierarchy.goal,
-        criteria: hierarchy.criteria,
-        alternatives: hierarchy.alternatives,
-        results: results,
-        criteriaMatrix: criteriaMatrix,
-        alternativeMatrices: alternativeMatrices
-      })
-      
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    } catch (error: any) {
-      console.error('❌ Ошибка при сохранении:', error)
-      const errorMessage = error.message || 'Проверьте подключение к серверу'
-      alert(`Ошибка при сохранении анализа:\n\n${errorMessage}\n\nПроверьте:\n1. Подключение к серверу\n2. Что все данные заполнены\n3. Консоль браузера для деталей`)
-    } finally {
-      setIsSaving(false)
-    }
-  }
 
   const analyzeResults = async (showErrorAlert = false) => {
     setIsAnalyzing(true)
@@ -696,35 +644,12 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             />
           </div>
           <p className="text-gray-600">Цель: <span className="font-semibold">{hierarchy.goal}</span></p>
+          <p className="text-sm text-green-600 mt-1 flex items-center gap-1">
+            <CheckCircle2 size={16} />
+            Данные автоматически сохранены в базу данных
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={saveToHistory}
-            disabled={isSaving}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              saveSuccess
-                ? 'bg-green-600 text-white'
-                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
-            }`}
-            title="Сохранить в историю"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Сохранение...
-              </>
-            ) : saveSuccess ? (
-              <>
-                <CheckCircle2 size={18} />
-                Сохранено!
-              </>
-            ) : (
-              <>
-                <Save size={18} />
-                Сохранить
-              </>
-            )}
-          </button>
           <button
             onClick={downloadResults}
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"

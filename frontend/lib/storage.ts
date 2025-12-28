@@ -69,8 +69,9 @@ export async function getSavedAnalyses(): Promise<SavedAnalysis[]> {
 
 /**
  * Сохранить анализ в базу данных
+ * Поддерживает сохранение промежуточных состояний и обновление существующих анализов
  */
-export async function saveAnalysis(analysis: Omit<SavedAnalysis, 'id' | 'timestamp'>): Promise<string> {
+export async function saveAnalysis(analysis: Partial<SavedAnalysis> & { goal: string; criteria: string[]; alternatives: string[] }): Promise<string> {
   try {
     const apiUrl = getApiUrl()
     const response = await fetch(`${apiUrl}/api/analyses`, {
@@ -79,6 +80,8 @@ export async function saveAnalysis(analysis: Omit<SavedAnalysis, 'id' | 'timesta
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        id: analysis.id,
+        timestamp: analysis.timestamp,
         goal: analysis.goal,
         criteria: analysis.criteria,
         alternatives: analysis.alternatives,

@@ -58,6 +58,7 @@ export async function initDatabase() {
 
 /**
  * Сохранить анализ в базу данных
+ * Поддерживает сохранение промежуточных состояний (без матриц или результатов)
  */
 export async function saveAnalysis(analysis) {
   if (!pool) {
@@ -66,6 +67,7 @@ export async function saveAnalysis(analysis) {
   
   // Логируем входящие данные для отладки
   console.log('📝 Попытка сохранения анализа:', {
+    id: analysis.id,
     hasGoal: !!analysis.goal,
     hasCriteria: !!analysis.criteria,
     criteriaCount: analysis.criteria?.length || 0,
@@ -82,9 +84,9 @@ export async function saveAnalysis(analysis) {
   const timestamp = analysis.timestamp || Date.now();
   
   try {
-    // Валидация данных перед сохранением
-    if (!analysis.goal || typeof analysis.goal !== 'string') {
-      throw new Error('Цель анализа обязательна и должна быть строкой');
+    // Базовая валидация обязательных полей
+    if (!analysis.goal || typeof analysis.goal !== 'string' || analysis.goal.trim() === '') {
+      throw new Error('Цель анализа обязательна и должна быть непустой строкой');
     }
     if (!analysis.criteria || !Array.isArray(analysis.criteria) || analysis.criteria.length === 0) {
       throw new Error('Критерии обязательны и должны быть непустым массивом');
@@ -92,11 +94,32 @@ export async function saveAnalysis(analysis) {
     if (!analysis.alternatives || !Array.isArray(analysis.alternatives) || analysis.alternatives.length === 0) {
       throw new Error('Альтернативы обязательны и должны быть непустым массивом');
     }
-    if (!analysis.criteriaMatrix || !Array.isArray(analysis.criteriaMatrix)) {
-      throw new Error('Матрица критериев обязательна и должна быть массивом');
+    
+    // Для матриц используем значения по умолчанию, если они не переданы
+    // Это позволяет сохранять промежуточные состояния
+    let criteriaMatrix = analysis.criteriaMatrix;
+    let alternativeMatrices = analysis.alternativeMatrices;
+    
+    // Если матрица критериев не передана, создаем единичную матрицу
+    if (!criteriaMatrix || !Array.isArray(criteriaMatrix) || criteriaMatrix.length === 0) {
+      const n = analysis.criteria.length;
+      criteriaMatrix = Array(n).fill(null).map(() => Array(n).fill(1));
+      for (let i = 0; i < n; i++) {
+        criteriaMatrix[i][i] = 1;
+      }
     }
-    if (!analysis.alternativeMatrices || !Array.isArray(analysis.alternativeMatrices)) {
-      throw new Error('Матрицы альтернатив обязательны и должны быть массивом');
+    
+    // Если матрицы альтернатив не переданы, создаем единичные матрицы для каждого критерия
+    if (!alternativeMatrices || !Array.isArray(alternativeMatrices) || alternativeMatrices.length === 0) {
+      const m = analysis.alternatives.length;
+      const n = analysis.criteria.length;
+      alternativeMatrices = Array(n).fill(null).map(() => {
+        const matrix = Array(m).fill(null).map(() => Array(m).fill(1));
+        for (let i = 0; i < m; i++) {
+          matrix[i][i] = 1;
+        }
+        return matrix;
+      });
     }
     
     const result = await pool.query(`
@@ -111,7 +134,7 @@ export async function saveAnalysis(analysis) {
         alternatives = EXCLUDED.alternatives,
         criteria_matrix = EXCLUDED.criteria_matrix,
         alternative_matrices = EXCLUDED.alternative_matrices,
-        results = EXCLUDED.results
+        results = COALESCE(EXCLUDED.results, analyses.results)
       RETURNING id, timestamp
     `, [
       id,
@@ -119,13 +142,13 @@ export async function saveAnalysis(analysis) {
       analysis.goal,
       JSON.stringify(analysis.criteria),
       JSON.stringify(analysis.alternatives),
-      JSON.stringify(analysis.criteriaMatrix),
-      JSON.stringify(analysis.alternativeMatrices),
+      JSON.stringify(criteriaMatrix),
+      JSON.stringify(alternativeMatrices),
       analysis.results ? JSON.stringify(analysis.results) : null
     ]);
     
     console.log('✅ Анализ успешно сохранен:', { id: result.rows[0].id, timestamp: result.rows[0].timestamp });
-    return result.rows[0];
+    return { id: result.rows[0].id, timestamp: parseInt(result.rows[0].timestamp) };
   } catch (error) {
     console.error('❌ Ошибка при сохранении анализа:', error);
     console.error('Детали ошибки:', {
