@@ -169,7 +169,7 @@ export default function PairwiseComparison({
     : title
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-gray-900">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">{currentTitle}</h2>
         <p className="text-gray-600">
@@ -184,12 +184,12 @@ export default function PairwiseComparison({
 
       {/* Comparison Matrix */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse text-gray-900">
           <thead>
             <tr>
-              <th className="border border-gray-300 p-2 bg-gray-50"></th>
+              <th className="border border-gray-300 p-2 bg-gray-50 text-gray-900"></th>
               {items.map((item, index) => (
-                <th key={index} className="border border-gray-300 p-2 bg-gray-50 text-sm font-medium text-center min-w-[120px]">
+                <th key={index} className="border border-gray-300 p-2 bg-gray-50 text-sm font-medium text-center min-w-[120px] text-gray-900">
                   {item}
                 </th>
               ))}
@@ -198,18 +198,18 @@ export default function PairwiseComparison({
           <tbody>
             {items.map((item1, i) => (
               <tr key={i}>
-                <td className="border border-gray-300 p-2 bg-gray-50 font-medium">
+                <td className="border border-gray-300 p-2 bg-gray-50 font-medium text-gray-900">
                   {item1}
                 </td>
                 {items.map((item2, j) => (
-                  <td key={j} className="border border-gray-300 p-2">
+                  <td key={j} className="border border-gray-300 p-2 text-gray-900">
                     {i === j ? (
-                      <div className="text-center text-gray-400">1</div>
+                      <div className="text-center text-gray-600">1</div>
                     ) : i < j ? (
                       <select
                         value={currentMatrix[i]?.[j] ?? 1}
                         onChange={(e) => updateMatrix(i, j, parseFloat(e.target.value))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                       >
                         {COMPARISON_SCALE.map((scale) => (
                           <option key={scale.value} value={scale.value}>
@@ -218,7 +218,7 @@ export default function PairwiseComparison({
                         ))}
                       </select>
                     ) : (
-                      <div className="text-center text-gray-500">
+                      <div className="text-center text-gray-700">
                         {currentMatrix[j]?.[i] ? (1 / currentMatrix[j][i]).toFixed(3) : '1.000'}
                       </div>
                     )}

@@ -111,34 +111,34 @@ export default function Home() {
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step === 'hierarchy' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 {step !== 'hierarchy' ? <CheckCircle2 size={20} /> : '1'}
               </div>
-              <span className="ml-2 font-medium">Иерархия</span>
+              <span className="ml-2 font-medium text-gray-900">Иерархия</span>
             </div>
             <div className="w-12 h-0.5 bg-gray-300"></div>
             <div className={`flex items-center ${step === 'criteria' || step === 'alternatives' || step === 'results' ? 'text-primary-600' : 'text-gray-400'}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step === 'criteria' ? 'bg-primary-600 text-white' : (step === 'alternatives' || step === 'results') ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 {(step === 'alternatives' || step === 'results') ? <CheckCircle2 size={20} /> : '2'}
               </div>
-              <span className="ml-2 font-medium">Критерии</span>
+              <span className="ml-2 font-medium text-gray-900">Критерии</span>
             </div>
             <div className="w-12 h-0.5 bg-gray-300"></div>
             <div className={`flex items-center ${step === 'alternatives' || step === 'results' ? 'text-primary-600' : 'text-gray-400'}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step === 'alternatives' ? 'bg-primary-600 text-white' : step === 'results' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 {step === 'results' ? <CheckCircle2 size={20} /> : '3'}
               </div>
-              <span className="ml-2 font-medium">Альтернативы</span>
+              <span className="ml-2 font-medium text-gray-900">Альтернативы</span>
             </div>
             <div className="w-12 h-0.5 bg-gray-300"></div>
             <div className={`flex items-center ${step === 'results' ? 'text-primary-600' : 'text-gray-400'}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step === 'results' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 4
               </div>
-              <span className="ml-2 font-medium">Результаты</span>
+              <span className="ml-2 font-medium text-gray-900">Результаты</span>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="bg-white rounded-lg shadow-xl p-6">
+        <div className="bg-white rounded-lg shadow-xl p-6 text-gray-900">
           {step === 'hierarchy' && (
             <HierarchyBuilder onComplete={handleHierarchyComplete} />
           )}
