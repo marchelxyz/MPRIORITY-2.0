@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader2 } from 'lucide-react'
+import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader2, Save } from 'lucide-react'
 import HierarchyGraph from './HierarchyGraph'
 import HelpTooltip from './HelpTooltip'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import ReactMarkdown from 'react-markdown'
+import { saveAnalysis, isStorageAvailable } from '@/lib/storage'
 
 interface ResultsProps {
   hierarchy: {
@@ -26,17 +27,21 @@ interface ResultsProps {
     alternativePrioritiesByCriteria: number[][]
     criteriaPriorities: number[]
   }
+  criteriaMatrix: number[][]
+  alternativeMatrices: number[][][]
   onReset: () => void
 }
 
 const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef']
 
-export default function Results({ hierarchy, results, onReset }: ResultsProps) {
+export default function Results({ hierarchy, results, criteriaMatrix, alternativeMatrices, onReset }: ResultsProps) {
   const [analysis, setAnalysis] = useState<string | null>(null)
   const [analysisModel, setAnalysisModel] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
   const [analysisRequested, setAnalysisRequested] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   const chartData = results.globalPriorities.map((alt, index) => ({
     name: alt.name,
@@ -93,6 +98,35 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
     a.download = `mpriority-results-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const saveToHistory = () => {
+    if (!isStorageAvailable()) {
+      alert('localStorage недоступен в вашем браузере. Сохранение невозможно.')
+      return
+    }
+
+    setIsSaving(true)
+    setSaveSuccess(false)
+
+    try {
+      saveAnalysis({
+        goal: hierarchy.goal,
+        criteria: hierarchy.criteria,
+        alternatives: hierarchy.alternatives,
+        results: results,
+        criteriaMatrix: criteriaMatrix,
+        alternativeMatrices: alternativeMatrices
+      })
+      
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (error) {
+      console.error('Ошибка при сохранении:', error)
+      alert('Ошибка при сохранении анализа. Попробуйте еще раз.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const analyzeResults = async (showErrorAlert = false) => {
@@ -448,6 +482,33 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
           <p className="text-gray-600">Цель: <span className="font-semibold">{hierarchy.goal}</span></p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={saveToHistory}
+            disabled={isSaving || !isStorageAvailable()}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              saveSuccess
+                ? 'bg-green-600 text-white'
+                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
+            title={!isStorageAvailable() ? 'localStorage недоступен в вашем браузере' : 'Сохранить в историю'}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Сохранение...
+              </>
+            ) : saveSuccess ? (
+              <>
+                <CheckCircle2 size={18} />
+                Сохранено!
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                Сохранить
+              </>
+            )}
+          </button>
           <button
             onClick={downloadResults}
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
