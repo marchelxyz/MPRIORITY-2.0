@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { checkConsistency, calculateGlobalPriorities } from './ahp.js';
 import { getGeminiProvider } from './gemini.js';
+import { initDatabase, saveAnalysis, getAllAnalyses, getAnalysisById, deleteAnalysis, getAnalysesCount } from './database.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -9,9 +10,25 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Инициализация базы данных при запуске
+let dbInitialized = false;
+initDatabase()
+  .then(() => {
+    dbInitialized = true;
+    console.log('✅ База данных готова к работе');
+  })
+  .catch((error) => {
+    console.error('❌ Ошибка инициализации БД:', error);
+    // Продолжаем работу даже если БД не доступна (для обратной совместимости)
+  });
+
 // Проверка здоровья сервера
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MPRIORITY 2.0 API is running' });
+  res.json({ 
+    status: 'ok', 
+    message: 'MPRIORITY 2.0 API is running',
+    database: dbInitialized ? 'connected' : 'disconnected'
+  });
 });
 
 // Проверка согласованности матрицы
@@ -101,6 +118,102 @@ ${results.alternativeConsistencies.map((cons, idx) => `${hierarchy.criteria[idx]
       error: error.message || 'Ошибка при анализе результатов',
       details: 'Проверьте настройку GEMINI_API_KEY и доступность сервиса Gemini'
     });
+  }
+});
+
+// Сохранение анализа в базу данных
+app.post('/api/analyses', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'База данных не доступна' });
+    }
+
+    const { goal, criteria, alternatives, criteriaMatrix, alternativeMatrices, results } = req.body;
+    
+    if (!goal || !criteria || !alternatives || !criteriaMatrix || !alternativeMatrices) {
+      return res.status(400).json({ error: 'Недостаточно данных для сохранения' });
+    }
+
+    const saved = await saveAnalysis({
+      goal,
+      criteria,
+      alternatives,
+      criteriaMatrix,
+      alternativeMatrices,
+      results
+    });
+
+    res.json({ success: true, id: saved.id, timestamp: saved.timestamp });
+  } catch (error) {
+    console.error('Ошибка при сохранении анализа:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Получение всех анализов
+app.get('/api/analyses', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'База данных не доступна' });
+    }
+
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const analyses = await getAllAnalyses(limit, offset);
+    const total = await getAnalysesCount();
+
+    res.json({
+      analyses,
+      total,
+      limit,
+      offset
+    });
+  } catch (error) {
+    console.error('Ошибка при получении анализов:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Получение анализа по ID
+app.get('/api/analyses/:id', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'База данных не доступна' });
+    }
+
+    const { id } = req.params;
+    const analysis = await getAnalysisById(id);
+
+    if (!analysis) {
+      return res.status(404).json({ error: 'Анализ не найден' });
+    }
+
+    res.json(analysis);
+  } catch (error) {
+    console.error('Ошибка при получении анализа:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Удаление анализа по ID
+app.delete('/api/analyses/:id', async (req, res) => {
+  try {
+    if (!dbInitialized) {
+      return res.status(503).json({ error: 'База данных не доступна' });
+    }
+
+    const { id } = req.params;
+    const deleted = await deleteAnalysis(id);
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Анализ не найден' });
+    }
+
+    res.json({ success: true, message: 'Анализ удален' });
+  } catch (error) {
+    console.error('Ошибка при удалении анализа:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 

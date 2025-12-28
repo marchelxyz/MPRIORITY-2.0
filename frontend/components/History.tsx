@@ -12,14 +12,22 @@ interface HistoryProps {
 export default function History({ onLoadAnalysis, onClose }: HistoryProps) {
   const [analyses, setAnalyses] = useState<SavedAnalysis[]>([])
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     loadAnalyses()
   }, [])
 
-  const loadAnalyses = () => {
-    const saved = getSavedAnalyses()
-    setAnalyses(saved)
+  const loadAnalyses = async () => {
+    setIsLoading(true)
+    try {
+      const saved = await getSavedAnalyses()
+      setAnalyses(saved)
+    } catch (error) {
+      console.error('Ошибка при загрузке анализов:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -28,21 +36,27 @@ export default function History({ onLoadAnalysis, onClose }: HistoryProps) {
     }
     
     setIsDeleting(id)
-    const success = deleteAnalysis(id)
-    if (success) {
-      loadAnalyses()
+    try {
+      const success = await deleteAnalysis(id)
+      if (success) {
+        await loadAnalyses()
+      }
+    } catch (error) {
+      console.error('Ошибка при удалении:', error)
+      alert('Ошибка при удалении анализа')
+    } finally {
+      setIsDeleting(null)
     }
-    setIsDeleting(null)
   }
 
-  const handleClearAll = () => {
+  const handleClearAll = async () => {
     if (!confirm('Вы уверены, что хотите удалить всю историю анализов? Это действие нельзя отменить.')) {
       return
     }
     
     const success = clearAllAnalyses()
     if (success) {
-      loadAnalyses()
+      await loadAnalyses()
     }
   }
 
@@ -69,6 +83,28 @@ export default function History({ onLoadAnalysis, onClose }: HistoryProps) {
     if (hours < 24) return `${hours} ${hours === 1 ? 'час' : hours < 5 ? 'часа' : 'часов'} назад`
     if (days < 7) return `${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} назад`
     return formatDate(timestamp)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">История анализов</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              <X size={24} />
+            </button>
+          </div>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Загрузка анализов...</p>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (analyses.length === 0) {

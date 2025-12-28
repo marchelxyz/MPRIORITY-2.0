@@ -106,7 +106,109 @@ npm start
 
 Сервер запустится на порту, указанном в переменной окружения `PORT` (по умолчанию 3001).
 
+### POST `/api/analyses`
+Сохранение анализа в базу данных
+
+**Request Body:**
+```json
+{
+  "goal": "Выбор ноутбука",
+  "criteria": ["Цена", "Производительность"],
+  "alternatives": ["Модель A", "Модель B"],
+  "criteriaMatrix": [[1, 2], [0.5, 1]],
+  "alternativeMatrices": [
+    [[1, 2], [0.5, 1]],
+    [[1, 0.5], [2, 1]]
+  ],
+  "results": {...}
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "id": "analysis_1234567890_abc123",
+  "timestamp": 1234567890
+}
+```
+
+### GET `/api/analyses`
+Получение всех анализов с пагинацией
+
+**Query Parameters:**
+- `limit` - Количество анализов (по умолчанию 50)
+- `offset` - Смещение (по умолчанию 0)
+
+**Response:**
+```json
+{
+  "analyses": [...],
+  "total": 100,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+### GET `/api/analyses/:id`
+Получение анализа по ID
+
+**Response:**
+```json
+{
+  "id": "analysis_1234567890_abc123",
+  "timestamp": 1234567890,
+  "goal": "Выбор ноутбука",
+  "criteria": ["Цена", "Производительность"],
+  "alternatives": ["Модель A", "Модель B"],
+  "criteriaMatrix": [[1, 2], [0.5, 1]],
+  "alternativeMatrices": [...],
+  "results": {...},
+  "createdAt": "2025-12-28T12:00:00.000Z"
+}
+```
+
+### DELETE `/api/analyses/:id`
+Удаление анализа по ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Анализ удален"
+}
+```
+
 ## Переменные окружения
 
 - `PORT` - Порт для запуска сервера (по умолчанию 3001)
 - `GEMINI_API_KEY` - API ключ Google Gemini для функции детального анализа результатов. Получить можно на https://makersuite.google.com/app/apikey
+- `DATABASE_URL` - URL подключения к PostgreSQL (для Railway автоматически предоставляется)
+  - Формат: `postgresql://user:password@host:port/database`
+  - Для локальной разработки можно использовать отдельные переменные:
+    - `DB_USER` - Имя пользователя БД (по умолчанию `postgres`)
+    - `DB_PASSWORD` - Пароль БД (по умолчанию `postgres`)
+    - `DB_HOST` - Хост БД (по умолчанию `localhost`)
+    - `DB_PORT` - Порт БД (по умолчанию `5432`)
+    - `DB_NAME` - Имя БД (по умолчанию `mpriority`)
+
+## База данных
+
+Приложение использует PostgreSQL для хранения анализов. При первом запуске автоматически создается таблица `analyses` со следующей структурой:
+
+- `id` (TEXT PRIMARY KEY) - Уникальный идентификатор анализа
+- `timestamp` (BIGINT) - Временная метка создания
+- `goal` (TEXT) - Цель анализа
+- `criteria` (JSONB) - Массив критериев
+- `alternatives` (JSONB) - Массив альтернатив
+- `criteria_matrix` (JSONB) - Матрица сравнения критериев
+- `alternative_matrices` (JSONB) - Матрицы сравнения альтернатив по каждому критерию
+- `results` (JSONB) - Результаты расчета (опционально)
+- `created_at` (TIMESTAMP) - Время создания записи
+
+### Настройка PostgreSQL на Railway
+
+1. Создайте новый PostgreSQL сервис в Railway
+2. Railway автоматически предоставит переменную окружения `DATABASE_URL`
+3. Приложение автоматически подключится к БД при запуске
+4. Таблица создается автоматически при первом запуске
