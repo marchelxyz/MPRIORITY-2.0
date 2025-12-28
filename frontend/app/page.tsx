@@ -43,13 +43,15 @@ export default function Home() {
     setStep('criteria')
   }
 
-  const handleCriteriaComplete = (matrix: number[][]) => {
-    setCriteriaMatrix(matrix)
+  const handleCriteriaComplete = (matrix: number[][] | number[][][]) => {
+    // Для критериев всегда передается number[][]
+    setCriteriaMatrix(matrix as number[][])
     setStep('alternatives')
   }
 
-  const handleAlternativesComplete = (matrices: number[][][]) => {
-    setAlternativeMatrices(matrices)
+  const handleAlternativesComplete = (matrices: number[][] | number[][][]) => {
+    // Для альтернатив всегда передается number[][][]
+    setAlternativeMatrices(matrices as number[][][])
     calculateResults()
   }
 
@@ -105,8 +107,8 @@ export default function Home() {
         {/* Progress Steps */}
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-4">
-            <div className={`flex items-center ${step === 'hierarchy' ? 'text-primary-600' : step !== 'hierarchy' ? 'text-green-600' : 'text-gray-400'}`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step === 'hierarchy' ? 'bg-primary-600 text-white' : step !== 'hierarchy' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+            <div className={`flex items-center ${step === 'hierarchy' ? 'text-primary-600' : 'text-gray-400'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step === 'hierarchy' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
                 {step !== 'hierarchy' ? <CheckCircle2 size={20} /> : '1'}
               </div>
               <span className="ml-2 font-medium">Иерархия</span>
