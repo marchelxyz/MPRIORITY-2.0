@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader2 } from 'lucide-react'
 import HierarchyGraph from './HierarchyGraph'
@@ -34,6 +34,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
   const [analysisModel, setAnalysisModel] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [analysisRequested, setAnalysisRequested] = useState(false)
 
   const chartData = results.globalPriorities.map((alt, index) => ({
     name: alt.name,
@@ -46,6 +47,15 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
     priority: (results.criteriaPriorities[index] * 100).toFixed(2),
     value: results.criteriaPriorities[index]
   }))
+
+  // Автоматически запрашиваем анализ при монтировании компонента
+  useEffect(() => {
+    if (!analysisRequested && !analysis && !isAnalyzing) {
+      setAnalysisRequested(true)
+      analyzeResults()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const downloadResults = () => {
     const data = {
@@ -83,7 +93,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
     URL.revokeObjectURL(url)
   }
 
-  const analyzeResults = async () => {
+  const analyzeResults = async (showErrorAlert = false) => {
     setIsAnalyzing(true)
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -99,16 +109,21 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
       })
 
       if (!response.ok) {
-        throw new Error('Ошибка при запросе анализа')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Ошибка при запросе анализа')
       }
 
       const data = await response.json()
       setAnalysis(data.analysis)
       setAnalysisModel(data.model || null)
     } catch (error) {
-      console.error('Ошибка:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
-      alert(`Ошибка при получении анализа: ${errorMessage}\n\nПроверьте подключение к серверу и настройку GEMINI_API_KEY.`)
+      console.error('Ошибка при получении анализа:', error)
+      // Показываем alert только если пользователь явно запросил анализ
+      if (showErrorAlert) {
+        const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
+        alert(`Ошибка при получении анализа: ${errorMessage}\n\nПроверьте подключение к серверу и настройку GEMINI_API_KEY.`)
+      }
+      // При автоматическом запросе просто не показываем анализ
     } finally {
       setIsAnalyzing(false)
     }
@@ -334,7 +349,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
             JSON
           </button>
           <button
-            onClick={analyzeResults}
+            onClick={() => analyzeResults(true)}
             disabled={isAnalyzing}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -346,7 +361,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
             ) : (
               <>
                 <Brain size={18} />
-                Детальный разбор
+                {analysis ? 'Обновить анализ' : 'Детальный разбор'}
               </>
             )}
           </button>
@@ -492,6 +507,44 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
         </div>
       </div>
 
+      {/* Детальный анализ от Gemini - отображается вместе с графиками */}
+      {isAnalyzing && (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 text-gray-900">
+          <div className="flex items-center gap-3">
+            <Loader2 size={24} className="text-purple-600 animate-spin" />
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Генерация детального анализа...</h3>
+              <p className="text-sm text-gray-600 mt-1">Используется AI для создания подробного заключения по результатам анализа</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analysis && (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 text-gray-900">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Brain size={24} className="text-purple-600" />
+              <h3 className="text-xl font-bold text-gray-900">Заключение и детальный анализ результатов</h3>
+            </div>
+            {analysisModel && (
+              <div className="text-xs text-purple-600 bg-purple-100 px-3 py-1 rounded-full font-medium">
+                Модель: {analysisModel}
+              </div>
+            )}
+          </div>
+          <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
+            {analysis.split('\n').map((paragraph, idx) => (
+              paragraph.trim() ? (
+                <p key={idx} className="mb-3 leading-relaxed">
+                  {paragraph}
+                </p>
+              ) : null
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Detailed Table */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 text-gray-900">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Детальная таблица приоритетов</h3>
@@ -526,32 +579,6 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
           </table>
         </div>
       </div>
-
-      {/* Детальный анализ от Gemini */}
-      {analysis && (
-        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 text-gray-900">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Brain size={24} className="text-purple-600" />
-              <h3 className="text-xl font-bold text-gray-900">Детальный анализ результатов</h3>
-            </div>
-            {analysisModel && (
-              <div className="text-xs text-purple-600 bg-purple-100 px-3 py-1 rounded-full font-medium">
-                Модель: {analysisModel}
-              </div>
-            )}
-          </div>
-          <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
-            {analysis.split('\n').map((paragraph, idx) => (
-              paragraph.trim() ? (
-                <p key={idx} className="mb-3 leading-relaxed">
-                  {paragraph}
-                </p>
-              ) : null
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
