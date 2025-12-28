@@ -26,6 +26,27 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+/* Исправление цвета текста и курсора в полях ввода */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  color: rgb(0, 0, 0) !important;
+  caret-color: rgb(0, 0, 0) !important;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+input[type="number"]::placeholder,
+input[type="search"]::placeholder,
+textarea::placeholder {
+  color: rgb(156, 163, 175) !important; /* gray-400 */
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
