@@ -4,7 +4,9 @@ import { useState } from 'react'
 import HierarchyBuilder from '@/components/HierarchyBuilder'
 import PairwiseComparison from '@/components/PairwiseComparison'
 import Results from '@/components/Results'
-import { CheckCircle2 } from 'lucide-react'
+import History from '@/components/History'
+import { CheckCircle2, History as HistoryIcon } from 'lucide-react'
+import { SavedAnalysis } from '@/lib/storage'
 
 type Step = 'hierarchy' | 'criteria' | 'alternatives' | 'results'
 
@@ -18,6 +20,7 @@ export default function Home() {
   const [criteriaMatrix, setCriteriaMatrix] = useState<number[][]>([])
   const [alternativeMatrices, setAlternativeMatrices] = useState<number[][][]>([])
   const [results, setResults] = useState<any>(null)
+  const [showHistory, setShowHistory] = useState(false)
 
   const handleHierarchyComplete = (data: typeof hierarchy) => {
     setHierarchy(data)
@@ -91,17 +94,81 @@ export default function Home() {
     setResults(null)
   }
 
+  const handleLoadAnalysis = (analysis: SavedAnalysis) => {
+    setHierarchy({
+      goal: analysis.goal,
+      criteria: analysis.criteria,
+      alternatives: analysis.alternatives
+    })
+    setCriteriaMatrix(analysis.criteriaMatrix)
+    setAlternativeMatrices(analysis.alternativeMatrices)
+    
+    // Вычисляем результаты сразу
+    calculateResultsFromSaved(analysis.criteriaMatrix, analysis.alternativeMatrices, {
+      goal: analysis.goal,
+      criteria: analysis.criteria,
+      alternatives: analysis.alternatives
+    })
+  }
+
+  const calculateResultsFromSaved = async (
+    savedCriteriaMatrix: number[][],
+    savedAlternativeMatrices: number[][][],
+    savedHierarchy: typeof hierarchy
+  ) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await fetch(`${apiUrl}/api/calculate-global-priorities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          hierarchy: savedHierarchy,
+          criteriaMatrix: savedCriteriaMatrix,
+          alternativeMatrices: savedAlternativeMatrices,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Ошибка расчета')
+      }
+
+      const data = await response.json()
+      setResults(data)
+      setStep('results')
+    } catch (error) {
+      console.error('Ошибка:', error)
+      alert('Ошибка при расчете результатов. Проверьте подключение к серверу.')
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            MPRIORITY 2.0
-          </h1>
-          <p className="text-gray-600">
-            Метод анализа иерархий (МАИ/AHP) для принятия решений
-          </p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1"></div>
+            <div className="flex-1">
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                MPRIORITY 2.0
+              </h1>
+              <p className="text-gray-600">
+                Метод анализа иерархий (МАИ/AHP) для принятия решений
+              </p>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <button
+                onClick={() => setShowHistory(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                title="История анализов"
+              >
+                <HistoryIcon size={20} />
+                <span className="hidden sm:inline">История</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Progress Steps */}
@@ -168,11 +235,21 @@ export default function Home() {
             <Results
               hierarchy={hierarchy}
               results={results}
+              criteriaMatrix={criteriaMatrix}
+              alternativeMatrices={alternativeMatrices}
               onReset={reset}
             />
           )}
         </div>
       </div>
+
+      {/* History Modal */}
+      {showHistory && (
+        <History
+          onLoadAnalysis={handleLoadAnalysis}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </main>
   )
 }
