@@ -2,6 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { RotateCcw, Download, CheckCircle2, AlertCircle } from 'lucide-react'
+import HierarchyGraph from './HierarchyGraph'
 
 interface ResultsProps {
   hierarchy: {
@@ -97,6 +98,17 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
             Новый анализ
           </button>
         </div>
+      </div>
+
+      {/* Hierarchy Graph */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Визуализация иерархии</h3>
+        <HierarchyGraph
+          goal={hierarchy.goal}
+          criteria={hierarchy.criteria}
+          alternatives={hierarchy.alternatives}
+          criteriaPriorities={results.criteriaPriorities}
+        />
       </div>
 
       {/* Consistency Status */}
