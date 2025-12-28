@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X, ArrowRight } from 'lucide-react'
+import { Plus, X, ArrowRight, CheckCircle2 } from 'lucide-react'
 import HelpTooltip from './HelpTooltip'
 
 interface HierarchyBuilderProps {
