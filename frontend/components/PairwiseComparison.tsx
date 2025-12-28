@@ -41,6 +41,7 @@ export default function PairwiseComparison({
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
 
+  // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
     console.log('🔄 Инициализация компонента PairwiseComparison:', {
       hasMatrix: !!matrix,
@@ -49,8 +50,7 @@ export default function PairwiseComparison({
       matricesCount: matrices?.length || 0,
       hasCriteria: !!criteria,
       criteriaCount: criteria?.length || 0,
-      itemsCount: items.length,
-      currentCriteriaIndex
+      itemsCount: items.length
     })
     
     if (matrix && matrix.length > 0) {
@@ -67,11 +67,17 @@ export default function PairwiseComparison({
         return initMatrix
       }
       
-      // Создаем массив матриц с правильным размером
+      // Создаем массив матриц с правильным размером, сохраняя существующие данные
       const normalizedMatrices = Array(criteria.length).fill(null).map((_, idx) => {
+        // Сначала используем переданную матрицу из пропсов (приоритет пропсам)
         if (matrices[idx] && matrices[idx].length > 0 && matrices[idx][0] && matrices[idx][0].length > 0) {
           return matrices[idx]
         }
+        // Если пропсов нет, используем существующую матрицу из currentMatrices, если она есть и правильного размера
+        if (currentMatrices[idx] && currentMatrices[idx].length === n && currentMatrices[idx][0]?.length === n) {
+          return currentMatrices[idx]
+        }
+        // Иначе создаем единичную матрицу
         return initEmptyMatrix()
       })
       
@@ -95,7 +101,25 @@ export default function PairwiseComparison({
       console.log('🆕 Инициализирована новая единичная матрица:', initMatrix)
       setCurrentMatrix(initMatrix)
     }
-  }, [matrix, matrices, criteria, items, currentCriteriaIndex])
+  }, [matrix, matrices, criteria, items]) // Убрали currentCriteriaIndex из зависимостей
+
+  // Отдельный эффект для переключения матрицы при изменении индекса критерия
+  // Используем только если матрицы уже инициализированы и имеют правильный размер
+  useEffect(() => {
+    if (matrices && criteria && currentMatrices.length === criteria.length && currentMatrices.length > 0) {
+      const targetMatrix = currentMatrices[currentCriteriaIndex]
+      if (targetMatrix && Array.isArray(targetMatrix) && targetMatrix.length > 0 && 
+          Array.isArray(targetMatrix[0]) && targetMatrix[0].length > 0) {
+        // Проверяем, что текущая матрица не совпадает с целевой (чтобы избежать лишних обновлений)
+        const currentMatrixStr = JSON.stringify(currentMatrix)
+        const targetMatrixStr = JSON.stringify(targetMatrix)
+        if (currentMatrixStr !== targetMatrixStr) {
+          console.log(`📖 Переключение на матрицу критерия ${currentCriteriaIndex}:`, targetMatrix)
+          setCurrentMatrix([...targetMatrix.map(row => [...row])]) // Глубокая копия
+        }
+      }
+    }
+  }, [currentCriteriaIndex]) // Только при изменении индекса
 
   const updateMatrix = (i: number, j: number, value: number) => {
     // Проверяем, что матрица инициализирована
@@ -124,21 +148,30 @@ export default function PairwiseComparison({
     setCurrentMatrix(newMatrix)
     
     if (matrices && criteria) {
-      // Создаем обновленный массив матриц с правильным размером
-      const updatedMatrices = currentMatrices.length === criteria.length 
-        ? [...currentMatrices]
-        : Array(criteria.length).fill(null).map((_, idx) => 
-            currentMatrices[idx] || (() => {
-              const n = items.length
-              const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
-              for (let k = 0; k < n; k++) {
-                initMatrix[k][k] = 1
-              }
-              return initMatrix
-            })()
-          )
+      // Создаем обновленный массив матриц, гарантируя правильный размер и сохраняя все данные
+      const n = items.length
+      const initEmptyMatrix = () => {
+        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+        for (let k = 0; k < n; k++) {
+          initMatrix[k][k] = 1
+        }
+        return initMatrix
+      }
       
-      updatedMatrices[currentCriteriaIndex] = newMatrix
+      // Создаем массив матриц с правильным размером, сохраняя все существующие данные
+      const updatedMatrices = Array(criteria.length).fill(null).map((_, idx) => {
+        // Если это текущий индекс, используем обновленную матрицу
+        if (idx === currentCriteriaIndex) {
+          return newMatrix
+        }
+        // Иначе используем существующую матрицу из currentMatrices, если она есть и правильного размера
+        if (currentMatrices[idx] && currentMatrices[idx].length === n && currentMatrices[idx][0]?.length === n) {
+          return currentMatrices[idx]
+        }
+        // Иначе создаем единичную матрицу
+        return initEmptyMatrix()
+      })
+      
       setCurrentMatrices(updatedMatrices)
       
       // Логируем обновление матрицы для отладки
@@ -189,21 +222,31 @@ export default function PairwiseComparison({
 
   const handleNext = () => {
     if (matrices && criteria && currentCriteriaIndex < criteria.length - 1) {
-      // Создаем обновленный массив матриц с сохранением текущей матрицы
-      const updatedMatrices = currentMatrices.length === criteria.length 
-        ? [...currentMatrices]
-        : Array(criteria.length).fill(null).map((_, idx) => 
-            currentMatrices[idx] || (() => {
-              const n = items.length
-              const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
-              for (let k = 0; k < n; k++) {
-                initMatrix[k][k] = 1
-              }
-              return initMatrix
-            })()
-          )
+      // Создаем обновленный массив матриц, гарантируя правильный размер
+      const n = items.length
+      const initEmptyMatrix = () => {
+        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+        for (let k = 0; k < n; k++) {
+          initMatrix[k][k] = 1
+        }
+        return initMatrix
+      }
       
-      // Сохраняем текущую матрицу перед переходом
+      // Создаем массив матриц с правильным размером, сохраняя все существующие данные
+      const updatedMatrices = Array(criteria.length).fill(null).map((_, idx) => {
+        // Если это текущий индекс, сохраняем текущую матрицу
+        if (idx === currentCriteriaIndex) {
+          return currentMatrix
+        }
+        // Иначе используем существующую матрицу из currentMatrices, если она есть и правильного размера
+        if (currentMatrices[idx] && currentMatrices[idx].length === n && currentMatrices[idx][0]?.length === n) {
+          return currentMatrices[idx]
+        }
+        // Иначе создаем единичную матрицу
+        return initEmptyMatrix()
+      })
+      
+      // Сохраняем текущую матрицу перед переходом (на всякий случай)
       updatedMatrices[currentCriteriaIndex] = currentMatrix
       
       console.log(`➡️ Переход к следующему критерию. Сохранена матрица для "${criteria[currentCriteriaIndex]}":`, {
@@ -221,23 +264,15 @@ export default function PairwiseComparison({
       
       // Переходим к следующему критерию
       const newIndex = currentCriteriaIndex + 1
-      setCurrentCriteriaIndex(newIndex)
       
-      // Загружаем матрицу следующего критерия
+      // Сразу загружаем матрицу следующего критерия
       const nextMatrix = updatedMatrices[newIndex]
       if (nextMatrix && nextMatrix.length > 0 && nextMatrix[0] && nextMatrix[0].length > 0) {
         console.log(`📖 Загружена существующая матрица для "${criteria[newIndex]}":`, nextMatrix)
-        setCurrentMatrix(nextMatrix)
-      } else {
-        // Инициализируем матрицу, если она не существует
-        const n = items.length
-        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
-        for (let k = 0; k < n; k++) {
-          initMatrix[k][k] = 1
-        }
-        console.log(`🆕 Инициализирована новая матрица для "${criteria[newIndex]}":`, initMatrix)
-        setCurrentMatrix(initMatrix)
+        setCurrentMatrix([...nextMatrix.map(row => [...row])]) // Глубокая копия
       }
+      
+      setCurrentCriteriaIndex(newIndex)
       setConsistency(null)
     } else {
       // Сохраняем текущую матрицу перед завершением
@@ -285,38 +320,44 @@ export default function PairwiseComparison({
 
   const handleBack = () => {
     if (matrices && criteria && currentCriteriaIndex > 0) {
-      // Создаем обновленный массив матриц с сохранением текущей матрицы
-      const updatedMatrices = currentMatrices.length === criteria.length 
-        ? [...currentMatrices]
-        : Array(criteria.length).fill(null).map((_, idx) => 
-            currentMatrices[idx] || (() => {
-              const n = items.length
-              const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
-              for (let k = 0; k < n; k++) {
-                initMatrix[k][k] = 1
-              }
-              return initMatrix
-            })()
-          )
+      // Создаем обновленный массив матриц, гарантируя правильный размер
+      const n = items.length
+      const initEmptyMatrix = () => {
+        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+        for (let k = 0; k < n; k++) {
+          initMatrix[k][k] = 1
+        }
+        return initMatrix
+      }
+      
+      // Создаем массив матриц с правильным размером, сохраняя все существующие данные
+      const updatedMatrices = Array(criteria.length).fill(null).map((_, idx) => {
+        // Если это текущий индекс, сохраняем текущую матрицу
+        if (idx === currentCriteriaIndex) {
+          return currentMatrix
+        }
+        // Иначе используем существующую матрицу из currentMatrices, если она есть и правильного размера
+        if (currentMatrices[idx] && currentMatrices[idx].length === n && currentMatrices[idx][0]?.length === n) {
+          return currentMatrices[idx]
+        }
+        // Иначе создаем единичную матрицу
+        return initEmptyMatrix()
+      })
       
       // Сохраняем текущую матрицу перед возвратом
       updatedMatrices[currentCriteriaIndex] = currentMatrix
       setCurrentMatrices(updatedMatrices)
       
       const newIndex = currentCriteriaIndex - 1
-      setCurrentCriteriaIndex(newIndex)
+      
+      // Сразу загружаем матрицу предыдущего критерия
       const prevMatrix = updatedMatrices[newIndex]
       if (prevMatrix && prevMatrix.length > 0 && prevMatrix[0] && prevMatrix[0].length > 0) {
-        setCurrentMatrix(prevMatrix)
-      } else {
-        // Инициализируем матрицу, если она не существует
-        const n = items.length
-        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
-        for (let k = 0; k < n; k++) {
-          initMatrix[k][k] = 1
-        }
-        setCurrentMatrix(initMatrix)
+        console.log(`📖 Загружена существующая матрица для "${criteria[newIndex]}":`, prevMatrix)
+        setCurrentMatrix([...prevMatrix.map(row => [...row])]) // Глубокая копия
       }
+      
+      setCurrentCriteriaIndex(newIndex)
       setConsistency(null)
     } else {
       onBack()
