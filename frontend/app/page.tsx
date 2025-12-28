@@ -54,20 +54,49 @@ export default function Home() {
 
   const handleAlternativesComplete = (matrices: number[][] | number[][][]) => {
     // Для альтернатив всегда передается number[][][]
-    setAlternativeMatrices(matrices as number[][][])
-    calculateResults()
+    const alternativeMatricesData = matrices as number[][][]
+    setAlternativeMatrices(alternativeMatricesData)
+    // Передаем матрицы напрямую, чтобы избежать проблемы с асинхронным обновлением состояния
+    calculateResultsWithMatrices(criteriaMatrix, alternativeMatricesData)
   }
 
   const calculateResults = async () => {
+    calculateResultsWithMatrices(criteriaMatrix, alternativeMatrices)
+  }
+
+  const calculateResultsWithMatrices = async (
+    criteriaMatrixData: number[][],
+    alternativeMatricesData: number[][][]
+  ) => {
     try {
-      // Простая проверка заполненности матриц перед расчетом
-      const isCriteriaMatrixUnfilled = criteriaMatrix.length > 0 && 
-        criteriaMatrix.every((row, i) => 
+      // Валидация входных данных
+      if (!criteriaMatrixData || criteriaMatrixData.length === 0) {
+        throw new Error('Матрица критериев не заполнена')
+      }
+      if (!alternativeMatricesData || alternativeMatricesData.length === 0) {
+        throw new Error('Матрицы альтернатив не заполнены')
+      }
+      
+      // Логируем данные для отладки
+      console.log('📊 Расчет результатов с матрицами:', {
+        goal: hierarchy.goal,
+        criteriaCount: hierarchy.criteria.length,
+        alternativesCount: hierarchy.alternatives.length,
+        criteriaMatrixSize: criteriaMatrixData.length,
+        criteriaMatrixSample: criteriaMatrixData.length > 0 ? criteriaMatrixData[0] : [],
+        alternativeMatricesCount: alternativeMatricesData.length,
+        alternativeMatricesSample: alternativeMatricesData.length > 0 && alternativeMatricesData[0].length > 0 
+          ? alternativeMatricesData[0][0] : []
+      })
+      
+      // Проверка заполненности матриц перед расчетом
+      const isCriteriaMatrixUnfilled = criteriaMatrixData.length > 0 && 
+        criteriaMatrixData.every((row, i) => 
           row.every((val, j) => i === j || val === 1)
         )
       
-      const isAlternativeMatricesUnfilled = alternativeMatrices.length > 0 &&
-        alternativeMatrices.some(matrix =>
+      const isAlternativeMatricesUnfilled = alternativeMatricesData.length > 0 &&
+        alternativeMatricesData.some(matrix =>
           matrix.length > 0 &&
           matrix.every((row, i) => 
             row.every((val, j) => i === j || val === 1)
@@ -75,6 +104,7 @@ export default function Home() {
         )
       
       if (isCriteriaMatrixUnfilled) {
+        console.warn('⚠️ Матрица критериев не заполнена (все значения = 1)')
         const proceed = confirm(
           '⚠️ Внимание: Матрица критериев не заполнена (все значения = 1).\n\n' +
           'Это приведет к равным приоритетам всех критериев (50/50 или равномерное распределение).\n\n' +
@@ -84,6 +114,7 @@ export default function Home() {
       }
       
       if (isAlternativeMatricesUnfilled) {
+        console.warn('⚠️ Одна или несколько матриц альтернатив не заполнены (все значения = 1)')
         const proceed = confirm(
           '⚠️ Внимание: Одна или несколько матриц альтернатив не заполнены (все значения = 1).\n\n' +
           'Это приведет к равным приоритетам альтернатив по соответствующим критериям.\n\n' +
@@ -92,12 +123,25 @@ export default function Home() {
         if (!proceed) return
       }
       
-      console.log('📊 Расчет результатов:', {
-        goal: hierarchy.goal,
-        criteriaCount: hierarchy.criteria.length,
-        alternativesCount: hierarchy.alternatives.length,
-        criteriaMatrixSize: criteriaMatrix.length,
-        alternativeMatricesCount: alternativeMatrices.length
+      // Детальное логирование матриц для отладки
+      console.log('📋 Детали матрицы критериев:', {
+        size: `${criteriaMatrixData.length}x${criteriaMatrixData[0]?.length || 0}`,
+        matrix: criteriaMatrixData,
+        hasNonOneValues: criteriaMatrixData.some((row, i) => 
+          row.some((val, j) => i !== j && val !== 1)
+        )
+      })
+      
+      console.log('📋 Детали матриц альтернатив:', {
+        count: alternativeMatricesData.length,
+        matrices: alternativeMatricesData.map((matrix, idx) => ({
+          criterion: hierarchy.criteria[idx],
+          size: `${matrix.length}x${matrix[0]?.length || 0}`,
+          matrix: matrix,
+          hasNonOneValues: matrix.some((row, i) => 
+            row.some((val, j) => i !== j && val !== 1)
+          )
+        }))
       })
       
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
@@ -108,8 +152,8 @@ export default function Home() {
         },
         body: JSON.stringify({
           hierarchy,
-          criteriaMatrix,
-          alternativeMatrices,
+          criteriaMatrix: criteriaMatrixData,
+          alternativeMatrices: alternativeMatricesData,
         }),
       })
 
@@ -140,52 +184,18 @@ export default function Home() {
   }
 
   const handleLoadAnalysis = (analysis: SavedAnalysis) => {
-    setHierarchy({
+    const loadedHierarchy = {
       goal: analysis.goal,
       criteria: analysis.criteria,
       alternatives: analysis.alternatives
-    })
+    }
+    
+    setHierarchy(loadedHierarchy)
     setCriteriaMatrix(analysis.criteriaMatrix)
     setAlternativeMatrices(analysis.alternativeMatrices)
     
-    // Вычисляем результаты сразу
-    calculateResultsFromSaved(analysis.criteriaMatrix, analysis.alternativeMatrices, {
-      goal: analysis.goal,
-      criteria: analysis.criteria,
-      alternatives: analysis.alternatives
-    })
-  }
-
-  const calculateResultsFromSaved = async (
-    savedCriteriaMatrix: number[][],
-    savedAlternativeMatrices: number[][][],
-    savedHierarchy: typeof hierarchy
-  ) => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
-      const response = await fetch(`${apiUrl}/api/calculate-global-priorities`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          hierarchy: savedHierarchy,
-          criteriaMatrix: savedCriteriaMatrix,
-          alternativeMatrices: savedAlternativeMatrices,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Ошибка расчета')
-      }
-
-      const data = await response.json()
-      setResults(data)
-      setStep('results')
-    } catch (error) {
-      console.error('Ошибка:', error)
-      alert('Ошибка при расчете результатов. Проверьте подключение к серверу.')
-    }
+    // Вычисляем результаты сразу, используя загруженные данные напрямую
+    calculateResultsWithMatrices(analysis.criteriaMatrix, analysis.alternativeMatrices)
   }
 
   return (

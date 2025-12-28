@@ -52,13 +52,61 @@ app.post('/api/calculate-global-priorities', (req, res) => {
   try {
     const { hierarchy, criteriaMatrix, alternativeMatrices } = req.body;
     
+    // Логируем входящие данные для отладки
+    console.log('📊 Получен запрос на расчет глобальных приоритетов:', {
+      hasHierarchy: !!hierarchy,
+      hasCriteriaMatrix: !!criteriaMatrix,
+      hasAlternativeMatrices: !!alternativeMatrices,
+      criteriaCount: hierarchy?.criteria?.length || 0,
+      alternativesCount: hierarchy?.alternatives?.length || 0,
+      criteriaMatrixSize: criteriaMatrix?.length || 0,
+      alternativeMatricesCount: alternativeMatrices?.length || 0
+    });
+    
     if (!hierarchy || !criteriaMatrix || !alternativeMatrices) {
       return res.status(400).json({ error: 'Недостаточно данных для расчета' });
     }
     
+    // Детальное логирование матриц
+    if (criteriaMatrix && criteriaMatrix.length > 0) {
+      console.log('📋 Матрица критериев:', {
+        size: `${criteriaMatrix.length}x${criteriaMatrix[0]?.length || 0}`,
+        matrix: criteriaMatrix,
+        sampleRow: criteriaMatrix[0],
+        hasNonOneValues: criteriaMatrix.some((row, i) => 
+          row.some((val, j) => i !== j && val !== 1)
+        )
+      });
+    }
+    
+    if (alternativeMatrices && alternativeMatrices.length > 0) {
+      console.log('📋 Матрицы альтернатив:', {
+        count: alternativeMatrices.length,
+        matrices: alternativeMatrices.map((matrix, idx) => ({
+          criterion: hierarchy.criteria?.[idx],
+          size: `${matrix.length}x${matrix[0]?.length || 0}`,
+          sampleRow: matrix[0],
+          hasNonOneValues: matrix.some((row, i) => 
+            row.some((val, j) => i !== j && val !== 1)
+          )
+        }))
+      });
+    }
+    
     const result = calculateGlobalPriorities(hierarchy, criteriaMatrix, alternativeMatrices);
+    
+    console.log('✅ Результаты расчета:', {
+      criteriaPriorities: result.criteriaPriorities,
+      globalPriorities: result.globalPriorities.map(alt => ({
+        name: alt.name,
+        priority: alt.priority,
+        rank: alt.rank
+      }))
+    });
+    
     res.json(result);
   } catch (error) {
+    console.error('❌ Ошибка при расчете глобальных приоритетов:', error);
     res.status(500).json({ error: error.message });
   }
 });
