@@ -133,13 +133,6 @@ export default function HierarchyGraph({
           )
         }}
         pathClassFunc={() => 'hierarchy-link'}
-        styles={{
-          links: {
-            stroke: '#94a3b8',
-            strokeWidth: 2,
-            fill: 'none'
-          }
-        }}
       />
       <style>{`
         .hierarchy-link {
