@@ -41,16 +41,35 @@ export default function PairwiseComparison({
   const [isChecking, setIsChecking] = useState(false)
 
   useEffect(() => {
-    if (matrix) {
+    if (matrix && matrix.length > 0) {
       setCurrentMatrix(matrix)
-    } else if (matrices && criteria) {
+    } else if (matrices && criteria && matrices.length > 0 && matrices[0]) {
       setCurrentMatrices(matrices)
-      setCurrentMatrix(matrices[0])
+      setCurrentMatrix(matrices[0] || [])
+    } else if (items.length > 0) {
+      // Инициализируем единичную матрицу, если матрица не передана
+      const n = items.length
+      const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+      for (let i = 0; i < n; i++) {
+        initMatrix[i][i] = 1
+      }
+      setCurrentMatrix(initMatrix)
     }
-  }, [matrix, matrices, criteria])
+  }, [matrix, matrices, criteria, items])
 
   const updateMatrix = (i: number, j: number, value: number) => {
-    const newMatrix = currentMatrix.map(row => [...row])
+    // Проверяем, что матрица инициализирована
+    let matrixToUpdate = currentMatrix
+    if (!matrixToUpdate || matrixToUpdate.length === 0 || !matrixToUpdate[i]) {
+      const n = items.length
+      const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+      for (let k = 0; k < n; k++) {
+        initMatrix[k][k] = 1
+      }
+      matrixToUpdate = initMatrix
+    }
+    
+    const newMatrix = matrixToUpdate.map(row => [...row])
     
     // Устанавливаем значение
     newMatrix[i][j] = value
@@ -101,7 +120,18 @@ export default function PairwiseComparison({
     if (matrices && criteria && currentCriteriaIndex < criteria.length - 1) {
       const newIndex = currentCriteriaIndex + 1
       setCurrentCriteriaIndex(newIndex)
-      setCurrentMatrix(currentMatrices[newIndex])
+      const nextMatrix = currentMatrices[newIndex]
+      if (nextMatrix && nextMatrix.length > 0) {
+        setCurrentMatrix(nextMatrix)
+      } else {
+        // Инициализируем матрицу, если она не существует
+        const n = items.length
+        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+        for (let k = 0; k < n; k++) {
+          initMatrix[k][k] = 1
+        }
+        setCurrentMatrix(initMatrix)
+      }
       setConsistency(null)
     } else {
       if (matrices && criteria) {
@@ -116,7 +146,18 @@ export default function PairwiseComparison({
     if (matrices && criteria && currentCriteriaIndex > 0) {
       const newIndex = currentCriteriaIndex - 1
       setCurrentCriteriaIndex(newIndex)
-      setCurrentMatrix(currentMatrices[newIndex])
+      const prevMatrix = currentMatrices[newIndex]
+      if (prevMatrix && prevMatrix.length > 0) {
+        setCurrentMatrix(prevMatrix)
+      } else {
+        // Инициализируем матрицу, если она не существует
+        const n = items.length
+        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+        for (let k = 0; k < n; k++) {
+          initMatrix[k][k] = 1
+        }
+        setCurrentMatrix(initMatrix)
+      }
       setConsistency(null)
     } else {
       onBack()
@@ -166,7 +207,7 @@ export default function PairwiseComparison({
                       <div className="text-center text-gray-400">1</div>
                     ) : i < j ? (
                       <select
-                        value={currentMatrix[i][j]}
+                        value={currentMatrix[i]?.[j] ?? 1}
                         onChange={(e) => updateMatrix(i, j, parseFloat(e.target.value))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       >
@@ -178,7 +219,7 @@ export default function PairwiseComparison({
                       </select>
                     ) : (
                       <div className="text-center text-gray-500">
-                        {(1 / currentMatrix[j][i]).toFixed(3)}
+                        {currentMatrix[j]?.[i] ? (1 / currentMatrix[j][i]).toFixed(3) : '1.000'}
                       </div>
                     )}
                   </td>
