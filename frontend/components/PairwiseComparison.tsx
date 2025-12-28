@@ -42,11 +42,28 @@ export default function PairwiseComparison({
   const [isChecking, setIsChecking] = useState(false)
 
   useEffect(() => {
+    console.log('🔄 Инициализация компонента PairwiseComparison:', {
+      hasMatrix: !!matrix,
+      matrixSize: matrix?.length || 0,
+      hasMatrices: !!matrices,
+      matricesCount: matrices?.length || 0,
+      hasCriteria: !!criteria,
+      criteriaCount: criteria?.length || 0,
+      itemsCount: items.length,
+      currentCriteriaIndex
+    })
+    
     if (matrix && matrix.length > 0) {
+      console.log('📥 Загружена матрица критериев из пропсов:', matrix)
       setCurrentMatrix(matrix)
     } else if (matrices && criteria && matrices.length > 0 && matrices[0]) {
+      console.log('📥 Загружены матрицы альтернатив из пропсов:', {
+        count: matrices.length,
+        currentIndex: currentCriteriaIndex,
+        currentMatrix: matrices[currentCriteriaIndex] || matrices[0]
+      })
       setCurrentMatrices(matrices)
-      setCurrentMatrix(matrices[0] || [])
+      setCurrentMatrix(matrices[currentCriteriaIndex] || matrices[0] || [])
     } else if (items.length > 0) {
       // Инициализируем единичную матрицу, если матрица не передана
       const n = items.length
@@ -54,9 +71,10 @@ export default function PairwiseComparison({
       for (let i = 0; i < n; i++) {
         initMatrix[i][i] = 1
       }
+      console.log('🆕 Инициализирована новая единичная матрица:', initMatrix)
       setCurrentMatrix(initMatrix)
     }
-  }, [matrix, matrices, criteria, items])
+  }, [matrix, matrices, criteria, items, currentCriteriaIndex])
 
   const updateMatrix = (i: number, j: number, value: number) => {
     // Проверяем, что матрица инициализирована
@@ -88,6 +106,23 @@ export default function PairwiseComparison({
       const newMatrices = [...currentMatrices]
       newMatrices[currentCriteriaIndex] = newMatrix
       setCurrentMatrices(newMatrices)
+      
+      // Логируем обновление матрицы для отладки
+      console.log(`📝 Обновлена матрица для критерия "${criteria[currentCriteriaIndex]}":`, {
+        index: currentCriteriaIndex,
+        position: `[${i},${j}]`,
+        value: value,
+        reciprocal: i !== j ? newMatrix[j][i] : 'N/A',
+        matrix: newMatrix
+      })
+    } else {
+      // Логируем обновление матрицы критериев
+      console.log('📝 Обновлена матрица критериев:', {
+        position: `[${i},${j}]`,
+        value: value,
+        reciprocal: i !== j ? newMatrix[j][i] : 'N/A',
+        matrix: newMatrix
+      })
     }
     
     // Сбрасываем проверку согласованности при изменении матрицы
@@ -124,10 +159,17 @@ export default function PairwiseComparison({
       newMatrices[currentCriteriaIndex] = currentMatrix
       setCurrentMatrices(newMatrices)
       
+      console.log(`➡️ Переход к следующему критерию. Сохранена матрица для "${criteria[currentCriteriaIndex]}":`, {
+        index: currentCriteriaIndex,
+        matrix: currentMatrix,
+        allMatrices: newMatrices
+      })
+      
       const newIndex = currentCriteriaIndex + 1
       setCurrentCriteriaIndex(newIndex)
       const nextMatrix = newMatrices[newIndex]
       if (nextMatrix && nextMatrix.length > 0 && nextMatrix[0] && nextMatrix[0].length > 0) {
+        console.log(`📖 Загружена существующая матрица для "${criteria[newIndex]}":`, nextMatrix)
         setCurrentMatrix(nextMatrix)
       } else {
         // Инициализируем матрицу, если она не существует
@@ -136,6 +178,7 @@ export default function PairwiseComparison({
         for (let k = 0; k < n; k++) {
           initMatrix[k][k] = 1
         }
+        console.log(`🆕 Инициализирована новая матрица для "${criteria[newIndex]}":`, initMatrix)
         setCurrentMatrix(initMatrix)
       }
       setConsistency(null)
@@ -144,8 +187,26 @@ export default function PairwiseComparison({
       if (matrices && criteria) {
         const finalMatrices = [...currentMatrices]
         finalMatrices[currentCriteriaIndex] = currentMatrix
+        
+        console.log('✅ Завершение сравнения альтернатив. Финальные матрицы:', {
+          count: finalMatrices.length,
+          matrices: finalMatrices.map((matrix, idx) => ({
+            criterion: criteria[idx],
+            matrix: matrix,
+            hasNonOneValues: matrix.some((row, i) => 
+              row.some((val, j) => i !== j && val !== 1)
+            )
+          }))
+        })
+        
         onComplete(finalMatrices)
       } else {
+        console.log('✅ Завершение сравнения критериев. Финальная матрица:', {
+          matrix: currentMatrix,
+          hasNonOneValues: currentMatrix.some((row, i) => 
+            row.some((val, j) => i !== j && val !== 1)
+          )
+        })
         onComplete(currentMatrix)
       }
     }
