@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
+import HelpTooltip from './HelpTooltip'
 
 interface PairwiseComparisonProps {
   title: string
@@ -171,7 +172,118 @@ export default function PairwiseComparison({
   return (
     <div className="space-y-6 text-gray-900">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">{currentTitle}</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-2xl font-bold text-gray-900">{currentTitle}</h2>
+          <HelpTooltip
+            title="Как выполнить попарное сравнение?"
+            type="guide"
+            content={
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-green-600" />
+                    Что такое попарное сравнение?
+                  </h4>
+                  <p className="text-gray-700 mb-3">
+                    Попарное сравнение — это метод оценки, при котором вы сравниваете элементы по два, 
+                    определяя, насколько один важнее другого. Это позволяет избежать путаницы при сравнении 
+                    множества элементов одновременно.
+                  </p>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-green-600" />
+                    Шкала сравнения (1-9)
+                  </h4>
+                  <div className="space-y-2 text-gray-700">
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <strong>1 — Равная важность</strong>
+                      <p className="text-sm text-gray-600 mt-1">Оба элемента одинаково важны</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <strong>3 — Умеренно важнее</strong>
+                      <p className="text-sm text-gray-600 mt-1">Один элемент немного важнее другого</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <strong>5 — Существенно важнее</strong>
+                      <p className="text-sm text-gray-600 mt-1">Один элемент заметно важнее</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <strong>7 — Очень важнее</strong>
+                      <p className="text-sm text-gray-600 mt-1">Один элемент значительно важнее</p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <strong>9 — Абсолютно важнее</strong>
+                      <p className="text-sm text-gray-600 mt-1">Один элемент критически важнее другого</p>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Значения 2, 4, 6, 8 — промежуточные между соседними значениями.
+                    </p>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-green-600" />
+                    Как заполнять таблицу?
+                  </h4>
+                  <div className="space-y-3 text-gray-700">
+                    <div>
+                      <strong>1. Диагональ (1, 1):</strong>
+                      <p className="ml-4 mt-1 text-sm">Всегда равна 1 — элемент сравнивается сам с собой</p>
+                    </div>
+                    
+                    <div>
+                      <strong>2. Верхняя часть таблицы:</strong>
+                      <p className="ml-4 mt-1 text-sm">
+                        Выберите значение от 1 до 9, показывающее, насколько элемент в строке важнее элемента в столбце.
+                        Например, если "Цена" важнее "Дизайна" в 5 раз, выберите 5.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <strong>3. Нижняя часть таблицы:</strong>
+                      <p className="ml-4 mt-1 text-sm">
+                        Заполняется автоматически — это обратное значение (1/выбранное значение).
+                        Если вы выбрали 5, то обратное значение будет 1/5 = 0.200.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-green-600" />
+                    Проверка согласованности
+                  </h4>
+                  <p className="text-gray-700 mb-2">
+                    После заполнения таблицы нажмите кнопку "Проверить согласованность". 
+                    Система проверит логичность ваших сравнений:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
+                    <li><strong>CR &lt; 10%</strong> — отличная согласованность, можно продолжать</li>
+                    <li><strong>CR 10-20%</strong> — приемлемая согласованность</li>
+                    <li><strong>CR &gt; 20%</strong> — низкая согласованность, рекомендуется пересмотреть сравнения</li>
+                  </ul>
+                </div>
+                
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-amber-900 mb-2 flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-amber-600" />
+                    Важные советы
+                  </h4>
+                  <ul className="list-disc list-inside space-y-1 text-amber-800 text-sm">
+                    <li>Будьте последовательны: если A важнее B в 3 раза, а B важнее C в 2 раза, то A должно быть важнее C примерно в 6 раз</li>
+                    <li>Не торопитесь — подумайте над каждым сравнением</li>
+                    <li>Если согласованность низкая, пересмотрите сравнения, которые кажутся вам неуверенными</li>
+                    <li>При сравнении альтернатив по каждому критерию думайте только об этом критерии</li>
+                  </ul>
+                </div>
+              </div>
+            }
+          />
+        </div>
         <p className="text-gray-600">
           Сравните элементы попарно. Выберите, насколько один элемент важнее другого по шкале от 1 до 9.
         </p>

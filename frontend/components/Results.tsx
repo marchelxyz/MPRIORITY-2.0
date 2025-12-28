@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader2 } from 'lucide-react'
 import HierarchyGraph from './HierarchyGraph'
+import HelpTooltip from './HelpTooltip'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import ReactMarkdown from 'react-markdown'
 
 interface ResultsProps {
   hierarchy: {
@@ -336,8 +338,113 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Результаты анализа</h2>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-2xl font-bold text-gray-900">Результаты анализа</h2>
+            <HelpTooltip
+              title="Как интерпретировать результаты?"
+              type="guide"
+              content={
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-green-600" />
+                      Что показывают результаты?
+                    </h4>
+                    <p className="text-gray-700 mb-3">
+                      После выполнения всех сравнений система рассчитывает глобальные приоритеты — 
+                      это числовые значения, показывающие относительную важность каждой альтернативы 
+                      с учетом всех критериев и их весов.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-green-600" />
+                      Ранжирование альтернатив
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      Альтернативы отсортированы по убыванию приоритета. Чем выше приоритет, 
+                      тем лучше вариант соответствует вашим критериям:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
+                      <li><strong>1 место</strong> — лучший вариант (наибольший приоритет)</li>
+                      <li><strong>2 место</strong> — второй по предпочтительности</li>
+                      <li>И так далее...</li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-green-600" />
+                      Приоритеты критериев
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      Показывает, насколько важен каждый критерий в общей картине решения. 
+                      Критерии с большим приоритетом сильнее влияют на итоговый результат.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-green-600" />
+                      Согласованность суждений
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      Коэффициент согласованности (CR) показывает логичность ваших сравнений:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
+                      <li><strong className="text-green-600">CR &lt; 10%</strong> — отличная согласованность</li>
+                      <li><strong className="text-blue-600">CR 10-20%</strong> — приемлемая согласованность</li>
+                      <li><strong className="text-orange-600">CR &gt; 20%</strong> — низкая согласованность, стоит пересмотреть сравнения</li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-green-600" />
+                      Детальная таблица приоритетов
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      Показывает приоритет каждой альтернативы по каждому критерию отдельно, 
+                      а также итоговый глобальный приоритет. Это помогает понять, почему одна 
+                      альтернатива оказалась лучше другой.
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-green-600" />
+                      Детальный анализ от AI
+                    </h4>
+                    <p className="text-gray-700 mb-2">
+                      Искусственный интеллект анализирует ваши результаты и предоставляет:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700 ml-4">
+                      <li>Интерпретацию результатов ранжирования</li>
+                      <li>Объяснение влияния каждого критерия</li>
+                      <li>Анализ согласованности и рекомендации</li>
+                      <li>Практические выводы для принятия решения</li>
+                    </ul>
+                  </div>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                      <CheckCircle2 size={18} className="text-blue-600" />
+                      Важно помнить
+                    </h4>
+                    <p className="text-blue-800 text-sm mb-2">
+                      Результаты МАИ — это инструмент поддержки принятия решений, а не абсолютная истина. 
+                      Используйте их вместе с вашим опытом и интуицией.
+                    </p>
+                    <p className="text-blue-800 text-sm">
+                      Вы можете сохранить результаты в PDF или JSON для дальнейшего анализа или презентации.
+                    </p>
+                  </div>
+                </div>
+              }
+            />
+          </div>
           <p className="text-gray-600">Цель: <span className="font-semibold">{hierarchy.goal}</span></p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -533,14 +640,25 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
               </div>
             )}
           </div>
-          <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
-            {analysis.split('\n').map((paragraph, idx) => (
-              paragraph.trim() ? (
-                <p key={idx} className="mb-3 leading-relaxed">
-                  {paragraph}
-                </p>
-              ) : null
-            ))}
+          <div className="prose prose-sm max-w-none text-gray-700">
+            <ReactMarkdown
+              components={{
+                p: ({node, ...props}) => <p className="mb-3 leading-relaxed" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                em: ({node, ...props}) => <em className="italic" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc list-inside ml-4 space-y-1 mb-3" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal list-inside ml-4 space-y-1 mb-3" {...props} />,
+                li: ({node, ...props}) => <li className="text-gray-700" {...props} />,
+                h1: ({node, ...props}) => <h1 className="text-2xl font-bold mb-3 mt-4 text-gray-900" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-xl font-bold mb-2 mt-3 text-gray-900" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-lg font-semibold mb-2 mt-3 text-gray-900" {...props} />,
+                h4: ({node, ...props}) => <h4 className="text-base font-semibold mb-1 mt-2 text-gray-900" {...props} />,
+                code: ({node, ...props}) => <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono" {...props} />,
+                blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-300 pl-4 italic my-3" {...props} />,
+              }}
+            >
+              {analysis}
+            </ReactMarkdown>
           </div>
         </div>
       )}
