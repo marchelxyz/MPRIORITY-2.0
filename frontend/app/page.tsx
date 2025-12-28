@@ -60,6 +60,46 @@ export default function Home() {
 
   const calculateResults = async () => {
     try {
+      // Простая проверка заполненности матриц перед расчетом
+      const isCriteriaMatrixUnfilled = criteriaMatrix.length > 0 && 
+        criteriaMatrix.every((row, i) => 
+          row.every((val, j) => i === j || val === 1)
+        )
+      
+      const isAlternativeMatricesUnfilled = alternativeMatrices.length > 0 &&
+        alternativeMatrices.some(matrix =>
+          matrix.length > 0 &&
+          matrix.every((row, i) => 
+            row.every((val, j) => i === j || val === 1)
+          )
+        )
+      
+      if (isCriteriaMatrixUnfilled) {
+        const proceed = confirm(
+          '⚠️ Внимание: Матрица критериев не заполнена (все значения = 1).\n\n' +
+          'Это приведет к равным приоритетам всех критериев (50/50 или равномерное распределение).\n\n' +
+          'Продолжить расчет?'
+        )
+        if (!proceed) return
+      }
+      
+      if (isAlternativeMatricesUnfilled) {
+        const proceed = confirm(
+          '⚠️ Внимание: Одна или несколько матриц альтернатив не заполнены (все значения = 1).\n\n' +
+          'Это приведет к равным приоритетам альтернатив по соответствующим критериям.\n\n' +
+          'Продолжить расчет?'
+        )
+        if (!proceed) return
+      }
+      
+      console.log('📊 Расчет результатов:', {
+        goal: hierarchy.goal,
+        criteriaCount: hierarchy.criteria.length,
+        alternativesCount: hierarchy.alternatives.length,
+        criteriaMatrixSize: criteriaMatrix.length,
+        alternativeMatricesCount: alternativeMatrices.length
+      })
+      
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       const response = await fetch(`${apiUrl}/api/calculate-global-priorities`, {
         method: 'POST',
@@ -74,15 +114,20 @@ export default function Home() {
       })
 
       if (!response.ok) {
-        throw new Error('Ошибка расчета')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Ошибка расчета')
       }
 
       const data = await response.json()
+      console.log('✅ Результаты рассчитаны:', {
+        globalPriorities: data.globalPriorities,
+        criteriaPriorities: data.criteriaPriorities
+      })
       setResults(data)
       setStep('results')
     } catch (error) {
-      console.error('Ошибка:', error)
-      alert('Ошибка при расчете результатов. Проверьте подключение к серверу.')
+      console.error('❌ Ошибка при расчете результатов:', error)
+      alert(`Ошибка при расчете результатов:\n\n${error instanceof Error ? error.message : 'Проверьте подключение к серверу'}`)
     }
   }
 

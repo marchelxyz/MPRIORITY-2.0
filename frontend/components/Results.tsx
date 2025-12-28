@@ -105,6 +105,31 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
     setSaveSuccess(false)
 
     try {
+      // Валидация данных перед сохранением
+      if (!hierarchy.goal || hierarchy.goal.trim() === '') {
+        throw new Error('Цель анализа не может быть пустой')
+      }
+      if (!hierarchy.criteria || hierarchy.criteria.length === 0) {
+        throw new Error('Список критериев пуст')
+      }
+      if (!hierarchy.alternatives || hierarchy.alternatives.length === 0) {
+        throw new Error('Список альтернатив пуст')
+      }
+      if (!criteriaMatrix || criteriaMatrix.length === 0) {
+        throw new Error('Матрица критериев не заполнена')
+      }
+      if (!alternativeMatrices || alternativeMatrices.length === 0) {
+        throw new Error('Матрицы альтернатив не заполнены')
+      }
+      
+      console.log('💾 Сохранение анализа:', {
+        goal: hierarchy.goal,
+        criteriaCount: hierarchy.criteria.length,
+        alternativesCount: hierarchy.alternatives.length,
+        criteriaMatrixSize: criteriaMatrix.length,
+        alternativeMatricesCount: alternativeMatrices.length
+      })
+      
       await saveAnalysis({
         goal: hierarchy.goal,
         criteria: hierarchy.criteria,
@@ -117,8 +142,9 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
       setSaveSuccess(true)
       setTimeout(() => setSaveSuccess(false), 3000)
     } catch (error: any) {
-      console.error('Ошибка при сохранении:', error)
-      alert(`Ошибка при сохранении анализа: ${error.message || 'Проверьте подключение к серверу'}`)
+      console.error('❌ Ошибка при сохранении:', error)
+      const errorMessage = error.message || 'Проверьте подключение к серверу'
+      alert(`Ошибка при сохранении анализа:\n\n${errorMessage}\n\nПроверьте:\n1. Подключение к серверу\n2. Что все данные заполнены\n3. Консоль браузера для деталей`)
     } finally {
       setIsSaving(false)
     }
@@ -568,7 +594,42 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
       {/* Consistency Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-gray-900">
-          <h3 className="font-semibold text-gray-900 mb-2">Согласованность критериев</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-gray-900">Согласованность критериев</h3>
+            <HelpTooltip
+              title="Что такое согласованность?"
+              type="info"
+              content={
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Что такое согласованность?</h4>
+                    <p className="text-gray-700">
+                      Согласованность (CR - Consistency Ratio) показывает, насколько логичны и последовательны ваши сравнения. 
+                      Она проверяет транзитивность суждений: если A важнее B в 3 раза, а B важнее C в 2 раза, 
+                      то A должно быть важнее C примерно в 6 раз (3 × 2).
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Зачем нужна согласованность?</h4>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li>Проверяет логичность ваших суждений</li>
+                      <li>Помогает выявить ошибки в сравнениях</li>
+                      <li>Повышает надежность результатов анализа</li>
+                      <li>Показывает, насколько уверенно вы можете принимать решение</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Интерпретация CR:</h4>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li><strong className="text-green-600">CR &lt; 10%</strong> — отличная согласованность</li>
+                      <li><strong className="text-blue-600">CR 10-20%</strong> — приемлемая согласованность</li>
+                      <li><strong className="text-orange-600">CR &gt; 20%</strong> — низкая согласованность, стоит пересмотреть сравнения</li>
+                    </ul>
+                  </div>
+                </div>
+              }
+            />
+          </div>
           <div className={`flex items-center gap-2 ${results.criteriaConsistency.isConsistent ? 'text-green-600' : 'text-orange-600'}`}>
             {results.criteriaConsistency.isConsistent ? (
               <>
@@ -582,9 +643,44 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
               </>
             )}
           </div>
+          {results.criteriaConsistency.cr > 0.2 && (
+            <div className="mt-2 text-sm text-orange-700 bg-orange-50 p-2 rounded">
+              <strong>Рекомендация:</strong> Пересмотрите сравнения критериев для улучшения согласованности.
+            </div>
+          )}
         </div>
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-gray-900">
-          <h3 className="font-semibold text-gray-900 mb-2">Согласованность альтернатив</h3>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-gray-900">Согласованность альтернатив</h3>
+            <HelpTooltip
+              title="Почему согласованность не применяется для матриц 2x2?"
+              type="info"
+              content={
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="font-semibold text-lg mb-2">Почему для матриц 2x2 согласованность не проверяется?</h4>
+                    <p className="text-gray-700 mb-2">
+                      Для матриц размером 2×2 проверка согласованности не применяется по следующим причинам:
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li><strong>Математическая причина:</strong> В матрице 2×2 есть только одно независимое сравнение (A vs B), 
+                      поэтому транзитивность проверить невозможно — нет третьего элемента для сравнения.</li>
+                      <li><strong>Теоретическая причина:</strong> Матрица 2×2 всегда согласована по определению, 
+                      так как если A важнее B в X раз, то B важнее A в 1/X раз — это единственное сравнение.</li>
+                      <li><strong>Практическая причина:</strong> Для проверки согласованности нужна матрица минимум 3×3, 
+                      где можно проверить транзитивность: если A важнее B, а B важнее C, то A должно быть важнее C.</li>
+                    </ul>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p className="text-sm text-blue-800">
+                      <strong>Вывод:</strong> Если у вас только 2 альтернативы, согласованность не проверяется, 
+                      но это нормально — просто сравните их напрямую по каждому критерию.
+                    </p>
+                  </div>
+                </div>
+              }
+            />
+          </div>
           <div className="space-y-1">
             {results.alternativeConsistencies.map((consistency, index) => {
               const isApplicable = consistency.isApplicable !== false;

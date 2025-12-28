@@ -64,10 +64,41 @@ export async function saveAnalysis(analysis) {
     throw new Error('База данных не инициализирована');
   }
   
+  // Логируем входящие данные для отладки
+  console.log('📝 Попытка сохранения анализа:', {
+    hasGoal: !!analysis.goal,
+    hasCriteria: !!analysis.criteria,
+    criteriaCount: analysis.criteria?.length || 0,
+    hasAlternatives: !!analysis.alternatives,
+    alternativesCount: analysis.alternatives?.length || 0,
+    hasCriteriaMatrix: !!analysis.criteriaMatrix,
+    criteriaMatrixSize: analysis.criteriaMatrix?.length || 0,
+    hasAlternativeMatrices: !!analysis.alternativeMatrices,
+    alternativeMatricesCount: analysis.alternativeMatrices?.length || 0,
+    hasResults: !!analysis.results
+  });
+  
   const id = analysis.id || `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const timestamp = analysis.timestamp || Date.now();
   
   try {
+    // Валидация данных перед сохранением
+    if (!analysis.goal || typeof analysis.goal !== 'string') {
+      throw new Error('Цель анализа обязательна и должна быть строкой');
+    }
+    if (!analysis.criteria || !Array.isArray(analysis.criteria) || analysis.criteria.length === 0) {
+      throw new Error('Критерии обязательны и должны быть непустым массивом');
+    }
+    if (!analysis.alternatives || !Array.isArray(analysis.alternatives) || analysis.alternatives.length === 0) {
+      throw new Error('Альтернативы обязательны и должны быть непустым массивом');
+    }
+    if (!analysis.criteriaMatrix || !Array.isArray(analysis.criteriaMatrix)) {
+      throw new Error('Матрица критериев обязательна и должна быть массивом');
+    }
+    if (!analysis.alternativeMatrices || !Array.isArray(analysis.alternativeMatrices)) {
+      throw new Error('Матрицы альтернатив обязательны и должны быть массивом');
+    }
+    
     const result = await pool.query(`
       INSERT INTO analyses (
         id, timestamp, goal, criteria, alternatives,
@@ -93,9 +124,16 @@ export async function saveAnalysis(analysis) {
       analysis.results ? JSON.stringify(analysis.results) : null
     ]);
     
+    console.log('✅ Анализ успешно сохранен:', { id: result.rows[0].id, timestamp: result.rows[0].timestamp });
     return result.rows[0];
   } catch (error) {
-    console.error('Ошибка при сохранении анализа:', error);
+    console.error('❌ Ошибка при сохранении анализа:', error);
+    console.error('Детали ошибки:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint
+    });
     throw error;
   }
 }
