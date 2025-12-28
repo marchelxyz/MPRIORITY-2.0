@@ -6,7 +6,7 @@ import PairwiseComparison from '@/components/PairwiseComparison'
 import Results from '@/components/Results'
 import History from '@/components/History'
 import { CheckCircle2, History as HistoryIcon } from 'lucide-react'
-import { SavedAnalysis } from '@/lib/storage'
+import { SavedAnalysis, saveAnalysis } from '@/lib/storage'
 
 type Step = 'hierarchy' | 'criteria' | 'alternatives' | 'results'
 
@@ -21,8 +21,45 @@ export default function Home() {
   const [alternativeMatrices, setAlternativeMatrices] = useState<number[][][]>([])
   const [results, setResults] = useState<any>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null)
 
-  const handleHierarchyComplete = (data: typeof hierarchy) => {
+  // Автоматическое сохранение в базу данных на каждом этапе
+  const autoSave = async (
+    hierarchyData: typeof hierarchy,
+    criteriaMatrixData?: number[][],
+    alternativeMatricesData?: number[][][],
+    resultsData?: any,
+    includeResults = false
+  ) => {
+    try {
+      // Проверяем, что есть минимальные данные для сохранения
+      if (!hierarchyData.goal || hierarchyData.criteria.length === 0 || hierarchyData.alternatives.length === 0) {
+        return
+      }
+
+      const savedId = await saveAnalysis({
+        id: currentAnalysisId || undefined,
+        timestamp: currentAnalysisId ? undefined : Date.now(),
+        goal: hierarchyData.goal,
+        criteria: hierarchyData.criteria,
+        alternatives: hierarchyData.alternatives,
+        criteriaMatrix: criteriaMatrixData && criteriaMatrixData.length > 0 ? criteriaMatrixData : undefined,
+        alternativeMatrices: alternativeMatricesData && alternativeMatricesData.length > 0 ? alternativeMatricesData : undefined,
+        results: includeResults && resultsData ? resultsData : undefined
+      })
+
+      if (savedId && !currentAnalysisId) {
+        setCurrentAnalysisId(savedId)
+      }
+
+      console.log('✅ Автоматическое сохранение выполнено:', { id: savedId, step })
+    } catch (error) {
+      console.error('❌ Ошибка автоматического сохранения:', error)
+      // Не показываем ошибку пользователю, так как это автоматическое сохранение
+    }
+  }
+
+  const handleHierarchyComplete = async (data: typeof hierarchy) => {
     setHierarchy(data)
     // Инициализируем матрицы единичными матрицами
     const n = data.criteria.length
@@ -44,18 +81,29 @@ export default function Home() {
     setCriteriaMatrix(initCriteriaMatrix)
     setAlternativeMatrices(initAlternativeMatrices)
     setStep('criteria')
+    
+    // Автоматическое сохранение после создания иерархии
+    await autoSave(data, initCriteriaMatrix, initAlternativeMatrices, undefined, false)
   }
 
-  const handleCriteriaComplete = (matrix: number[][] | number[][][]) => {
+  const handleCriteriaComplete = async (matrix: number[][] | number[][][]) => {
     // Для критериев всегда передается number[][]
-    setCriteriaMatrix(matrix as number[][])
+    const criteriaMatrixData = matrix as number[][]
+    setCriteriaMatrix(criteriaMatrixData)
     setStep('alternatives')
+    
+    // Автоматическое сохранение после заполнения матрицы критериев
+    await autoSave(hierarchy, criteriaMatrixData, alternativeMatrices, undefined, false)
   }
 
-  const handleAlternativesComplete = (matrices: number[][] | number[][][]) => {
+  const handleAlternativesComplete = async (matrices: number[][] | number[][][]) => {
     // Для альтернатив всегда передается number[][][]
     const alternativeMatricesData = matrices as number[][][]
     setAlternativeMatrices(alternativeMatricesData)
+    
+    // Автоматическое сохранение после заполнения матриц альтернатив
+    await autoSave(hierarchy, criteriaMatrix, alternativeMatricesData, undefined, false)
+    
     // Передаем матрицы напрямую, чтобы избежать проблемы с асинхронным обновлением состояния
     calculateResultsWithMatrices(criteriaMatrix, alternativeMatricesData)
   }
@@ -169,6 +217,9 @@ export default function Home() {
       })
       setResults(data)
       setStep('results')
+      
+      // Автоматическое сохранение после расчета результатов
+      await autoSave(hierarchy, criteriaMatrixData, alternativeMatricesData, data, true)
     } catch (error) {
       console.error('❌ Ошибка при расчете результатов:', error)
       alert(`Ошибка при расчете результатов:\n\n${error instanceof Error ? error.message : 'Проверьте подключение к серверу'}`)
@@ -181,6 +232,7 @@ export default function Home() {
     setCriteriaMatrix([])
     setAlternativeMatrices([])
     setResults(null)
+    setCurrentAnalysisId(null)
   }
 
   const handleLoadAnalysis = (analysis: SavedAnalysis) => {
@@ -193,9 +245,16 @@ export default function Home() {
     setHierarchy(loadedHierarchy)
     setCriteriaMatrix(analysis.criteriaMatrix)
     setAlternativeMatrices(analysis.alternativeMatrices)
+    setCurrentAnalysisId(analysis.id)
     
-    // Вычисляем результаты сразу, используя загруженные данные напрямую
-    calculateResultsWithMatrices(analysis.criteriaMatrix, analysis.alternativeMatrices)
+    // Если есть результаты, загружаем их
+    if (analysis.results) {
+      setResults(analysis.results)
+      setStep('results')
+    } else {
+      // Вычисляем результаты сразу, используя загруженные данные напрямую
+      calculateResultsWithMatrices(analysis.criteriaMatrix, analysis.alternativeMatrices)
+    }
   }
 
   return (

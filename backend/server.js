@@ -176,7 +176,7 @@ ${results.alternativeConsistencies.map((cons, idx) => {
   }
 });
 
-// Сохранение анализа в базу данных
+// Сохранение анализа в базу данных (поддерживает промежуточные состояния)
 app.post('/api/analyses', async (req, res) => {
   try {
     if (!dbInitialized) {
@@ -184,10 +184,11 @@ app.post('/api/analyses', async (req, res) => {
       return res.status(503).json({ error: 'База данных не доступна' });
     }
 
-    const { goal, criteria, alternatives, criteriaMatrix, alternativeMatrices, results } = req.body;
+    const { id, timestamp, goal, criteria, alternatives, criteriaMatrix, alternativeMatrices, results } = req.body;
     
     // Детальная валидация данных
     console.log('📥 Получен запрос на сохранение анализа:', {
+      id,
       hasGoal: !!goal,
       hasCriteria: !!criteria,
       criteriaCount: criteria?.length || 0,
@@ -209,14 +210,11 @@ app.post('/api/analyses', async (req, res) => {
     if (!alternatives || !Array.isArray(alternatives) || alternatives.length === 0) {
       return res.status(400).json({ error: 'Альтернативы обязательны и должны быть непустым массивом' });
     }
-    if (!criteriaMatrix || !Array.isArray(criteriaMatrix) || criteriaMatrix.length === 0) {
-      return res.status(400).json({ error: 'Матрица критериев обязательна и должна быть непустым массивом' });
-    }
-    if (!alternativeMatrices || !Array.isArray(alternativeMatrices) || alternativeMatrices.length === 0) {
-      return res.status(400).json({ error: 'Матрицы альтернатив обязательны и должны быть непустым массивом' });
-    }
+    // Матрицы могут быть не переданы для промежуточных состояний - они будут созданы автоматически
 
     const saved = await saveAnalysis({
+      id,
+      timestamp,
       goal,
       criteria,
       alternatives,
