@@ -54,9 +54,14 @@ export default function History({ onLoadAnalysis, onClose }: HistoryProps) {
       return
     }
     
-    const success = clearAllAnalyses()
-    if (success) {
-      await loadAnalyses()
+    try {
+      const success = await clearAllAnalyses()
+      if (success) {
+        await loadAnalyses()
+      }
+    } catch (error: any) {
+      console.error('Ошибка при очистке истории:', error)
+      alert(`Ошибка при очистке истории: ${error.message || 'Проверьте подключение к серверу'}`)
     }
   }
 
