@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { checkConsistency, calculateGlobalPriorities } from './ahp.js';
+import { getGeminiProvider } from './gemini.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -55,13 +55,8 @@ app.post('/api/analyze-results', async (req, res) => {
       return res.status(400).json({ error: 'Недостаточно данных для анализа' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'API ключ Gemini не настроен. Установите переменную окружения GEMINI_API_KEY' });
-    }
-
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+    // Получаем провайдер Gemini с автоматическим fallback
+    const geminiProvider = getGeminiProvider();
 
     // Формируем промпт для анализа
     const prompt = `Ты эксперт по методу анализа иерархий (AHP) Томаса Саати. Проанализируй результаты анализа и предоставь детальный разбор на русском языке.
@@ -93,14 +88,19 @@ ${results.alternativeConsistencies.map((cons, idx) => `${hierarchy.criteria[idx]
 
 Ответ должен быть структурированным, понятным и полезным для принятия решения.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // Генерируем контент с автоматическим fallback между моделями
+    const result = await geminiProvider.generateContent(prompt);
 
-    res.json({ analysis: text });
+    res.json({ 
+      analysis: result.text,
+      model: result.model // Информация о модели, которая была использована
+    });
   } catch (error) {
     console.error('Ошибка при запросе к Gemini:', error);
-    res.status(500).json({ error: error.message || 'Ошибка при анализе результатов' });
+    res.status(500).json({ 
+      error: error.message || 'Ошибка при анализе результатов',
+      details: 'Проверьте настройку GEMINI_API_KEY и доступность сервиса Gemini'
+    });
   }
 });
 

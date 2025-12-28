@@ -31,6 +31,7 @@ const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef'
 
 export default function Results({ hierarchy, results, onReset }: ResultsProps) {
   const [analysis, setAnalysis] = useState<string | null>(null)
+  const [analysisModel, setAnalysisModel] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
@@ -103,9 +104,11 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
 
       const data = await response.json()
       setAnalysis(data.analysis)
+      setAnalysisModel(data.model || null)
     } catch (error) {
       console.error('Ошибка:', error)
-      alert('Ошибка при получении анализа. Проверьте подключение к серверу и настройку GEMINI_API_KEY.')
+      const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка'
+      alert(`Ошибка при получении анализа: ${errorMessage}\n\nПроверьте подключение к серверу и настройку GEMINI_API_KEY.`)
     } finally {
       setIsAnalyzing(false)
     }
@@ -527,9 +530,16 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
       {/* Детальный анализ от Gemini */}
       {analysis && (
         <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-6 text-gray-900">
-          <div className="flex items-center gap-2 mb-4">
-            <Brain size={24} className="text-purple-600" />
-            <h3 className="text-xl font-bold text-gray-900">Детальный анализ результатов</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Brain size={24} className="text-purple-600" />
+              <h3 className="text-xl font-bold text-gray-900">Детальный анализ результатов</h3>
+            </div>
+            {analysisModel && (
+              <div className="text-xs text-purple-600 bg-purple-100 px-3 py-1 rounded-full font-medium">
+                Модель: {analysisModel}
+              </div>
+            )}
           </div>
           <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap">
             {analysis.split('\n').map((paragraph, idx) => (
