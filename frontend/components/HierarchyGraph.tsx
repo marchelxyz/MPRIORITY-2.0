@@ -77,10 +77,11 @@ export default function HierarchyGraph({
         nodeSize={nodeSize}
         separation={separation}
         renderCustomNodeElement={(rd3tProps) => {
-          const { nodeDatum, toggleNode } = rd3tProps
-          const isRoot = nodeDatum.depth === 0
-          const isCriterion = nodeDatum.depth === 1
-          const isAlternative = nodeDatum.depth === 2
+          const { nodeDatum, toggleNode, hierarchyPointNode } = rd3tProps
+          const depth = hierarchyPointNode.depth
+          const isRoot = depth === 0
+          const isCriterion = depth === 1
+          const isAlternative = depth === 2
 
           return (
             <g>
