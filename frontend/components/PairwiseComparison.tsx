@@ -56,14 +56,35 @@ export default function PairwiseComparison({
     if (matrix && matrix.length > 0) {
       console.log('📥 Загружена матрица критериев из пропсов:', matrix)
       setCurrentMatrix(matrix)
-    } else if (matrices && criteria && matrices.length > 0 && matrices[0]) {
-      console.log('📥 Загружены матрицы альтернатив из пропсов:', {
-        count: matrices.length,
-        currentIndex: currentCriteriaIndex,
-        currentMatrix: matrices[currentCriteriaIndex] || matrices[0]
+    } else if (matrices && criteria) {
+      // Гарантируем, что массив матриц имеет правильный размер
+      const n = items.length
+      const initEmptyMatrix = () => {
+        const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+        for (let i = 0; i < n; i++) {
+          initMatrix[i][i] = 1
+        }
+        return initMatrix
+      }
+      
+      // Создаем массив матриц с правильным размером
+      const normalizedMatrices = Array(criteria.length).fill(null).map((_, idx) => {
+        if (matrices[idx] && matrices[idx].length > 0 && matrices[idx][0] && matrices[idx][0].length > 0) {
+          return matrices[idx]
+        }
+        return initEmptyMatrix()
       })
-      setCurrentMatrices(matrices)
-      setCurrentMatrix(matrices[currentCriteriaIndex] || matrices[0] || [])
+      
+      console.log('📥 Загружены матрицы альтернатив из пропсов:', {
+        originalCount: matrices.length,
+        normalizedCount: normalizedMatrices.length,
+        criteriaCount: criteria.length,
+        currentIndex: currentCriteriaIndex,
+        currentMatrix: normalizedMatrices[currentCriteriaIndex] || normalizedMatrices[0]
+      })
+      
+      setCurrentMatrices(normalizedMatrices)
+      setCurrentMatrix(normalizedMatrices[currentCriteriaIndex] || normalizedMatrices[0] || initEmptyMatrix())
     } else if (items.length > 0) {
       // Инициализируем единичную матрицу, если матрица не передана
       const n = items.length
@@ -103,9 +124,22 @@ export default function PairwiseComparison({
     setCurrentMatrix(newMatrix)
     
     if (matrices && criteria) {
-      const newMatrices = [...currentMatrices]
-      newMatrices[currentCriteriaIndex] = newMatrix
-      setCurrentMatrices(newMatrices)
+      // Создаем обновленный массив матриц с правильным размером
+      const updatedMatrices = currentMatrices.length === criteria.length 
+        ? [...currentMatrices]
+        : Array(criteria.length).fill(null).map((_, idx) => 
+            currentMatrices[idx] || (() => {
+              const n = items.length
+              const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+              for (let k = 0; k < n; k++) {
+                initMatrix[k][k] = 1
+              }
+              return initMatrix
+            })()
+          )
+      
+      updatedMatrices[currentCriteriaIndex] = newMatrix
+      setCurrentMatrices(updatedMatrices)
       
       // Логируем обновление матрицы для отладки
       console.log(`📝 Обновлена матрица для критерия "${criteria[currentCriteriaIndex]}":`, {
@@ -113,7 +147,8 @@ export default function PairwiseComparison({
         position: `[${i},${j}]`,
         value: value,
         reciprocal: i !== j ? newMatrix[j][i] : 'N/A',
-        matrix: newMatrix
+        matrix: newMatrix,
+        matricesCount: updatedMatrices.length
       })
     } else {
       // Логируем обновление матрицы критериев
@@ -154,20 +189,42 @@ export default function PairwiseComparison({
 
   const handleNext = () => {
     if (matrices && criteria && currentCriteriaIndex < criteria.length - 1) {
-      // Сохраняем текущую матрицу перед переходом к следующему критерию
-      const newMatrices = [...currentMatrices]
-      newMatrices[currentCriteriaIndex] = currentMatrix
-      setCurrentMatrices(newMatrices)
+      // Создаем обновленный массив матриц с сохранением текущей матрицы
+      const updatedMatrices = currentMatrices.length === criteria.length 
+        ? [...currentMatrices]
+        : Array(criteria.length).fill(null).map((_, idx) => 
+            currentMatrices[idx] || (() => {
+              const n = items.length
+              const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+              for (let k = 0; k < n; k++) {
+                initMatrix[k][k] = 1
+              }
+              return initMatrix
+            })()
+          )
+      
+      // Сохраняем текущую матрицу перед переходом
+      updatedMatrices[currentCriteriaIndex] = currentMatrix
       
       console.log(`➡️ Переход к следующему критерию. Сохранена матрица для "${criteria[currentCriteriaIndex]}":`, {
         index: currentCriteriaIndex,
         matrix: currentMatrix,
-        allMatrices: newMatrices
+        allMatrices: updatedMatrices,
+        matricesCount: updatedMatrices.length,
+        hasNonOneValues: currentMatrix.some((row, i) => 
+          row.some((val, j) => i !== j && val !== 1)
+        )
       })
       
+      // Обновляем состояние всех матриц
+      setCurrentMatrices(updatedMatrices)
+      
+      // Переходим к следующему критерию
       const newIndex = currentCriteriaIndex + 1
       setCurrentCriteriaIndex(newIndex)
-      const nextMatrix = newMatrices[newIndex]
+      
+      // Загружаем матрицу следующего критерия
+      const nextMatrix = updatedMatrices[newIndex]
       if (nextMatrix && nextMatrix.length > 0 && nextMatrix[0] && nextMatrix[0].length > 0) {
         console.log(`📖 Загружена существующая матрица для "${criteria[newIndex]}":`, nextMatrix)
         setCurrentMatrix(nextMatrix)
@@ -185,7 +242,21 @@ export default function PairwiseComparison({
     } else {
       // Сохраняем текущую матрицу перед завершением
       if (matrices && criteria) {
-        const finalMatrices = [...currentMatrices]
+        // Создаем финальный массив матриц с сохранением текущей матрицы
+        const finalMatrices = currentMatrices.length === criteria.length 
+          ? [...currentMatrices]
+          : Array(criteria.length).fill(null).map((_, idx) => 
+              currentMatrices[idx] || (() => {
+                const n = items.length
+                const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+                for (let k = 0; k < n; k++) {
+                  initMatrix[k][k] = 1
+                }
+                return initMatrix
+              })()
+            )
+        
+        // Сохраняем текущую матрицу
         finalMatrices[currentCriteriaIndex] = currentMatrix
         
         console.log('✅ Завершение сравнения альтернатив. Финальные матрицы:', {
@@ -214,14 +285,27 @@ export default function PairwiseComparison({
 
   const handleBack = () => {
     if (matrices && criteria && currentCriteriaIndex > 0) {
-      // Сохраняем текущую матрицу перед возвратом к предыдущему критерию
-      const newMatrices = [...currentMatrices]
-      newMatrices[currentCriteriaIndex] = currentMatrix
-      setCurrentMatrices(newMatrices)
+      // Создаем обновленный массив матриц с сохранением текущей матрицы
+      const updatedMatrices = currentMatrices.length === criteria.length 
+        ? [...currentMatrices]
+        : Array(criteria.length).fill(null).map((_, idx) => 
+            currentMatrices[idx] || (() => {
+              const n = items.length
+              const initMatrix = Array(n).fill(null).map(() => Array(n).fill(1))
+              for (let k = 0; k < n; k++) {
+                initMatrix[k][k] = 1
+              }
+              return initMatrix
+            })()
+          )
+      
+      // Сохраняем текущую матрицу перед возвратом
+      updatedMatrices[currentCriteriaIndex] = currentMatrix
+      setCurrentMatrices(updatedMatrices)
       
       const newIndex = currentCriteriaIndex - 1
       setCurrentCriteriaIndex(newIndex)
-      const prevMatrix = newMatrices[newIndex]
+      const prevMatrix = updatedMatrices[newIndex]
       if (prevMatrix && prevMatrix.length > 0 && prevMatrix[0] && prevMatrix[0].length > 0) {
         setCurrentMatrix(prevMatrix)
       } else {
