@@ -94,7 +94,14 @@ ${hierarchy.criteria.map((crit, idx) => `${crit}: ${(results.criteriaPriorities[
 - Согласованность критериев: CR = ${(results.criteriaConsistency.cr * 100).toFixed(2)}% ${results.criteriaConsistency.isConsistent ? '(приемлемо)' : '(низкая согласованность)'}
 
 - Согласованность альтернатив по критериям:
-${results.alternativeConsistencies.map((cons, idx) => `${hierarchy.criteria[idx]}: CR = ${(cons.cr * 100).toFixed(2)}%`).join('\n')}
+${results.alternativeConsistencies.map((cons, idx) => {
+  const isApplicable = cons.isApplicable !== false;
+  if (isApplicable) {
+    return `${hierarchy.criteria[idx]}: CR = ${(cons.cr * 100).toFixed(2)}%`;
+  } else {
+    return `${hierarchy.criteria[idx]}: Согласованность не применяется (матрица ${cons.n}x${cons.n})`;
+  }
+}).join('\n')}
 
 Предоставь детальный анализ, который включает:
 1. Интерпретацию результатов ранжирования альтернатив

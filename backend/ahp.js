@@ -37,6 +37,11 @@ export function calculateLambdaMax(matrix, priorities) {
   let lambdaMax = 0;
   
   for (let i = 0; i < n; i++) {
+    // Проверка на деление на ноль
+    if (priorities[i] === 0 || !isFinite(priorities[i])) {
+      continue;
+    }
+    
     let sum = 0;
     for (let j = 0; j < n; j++) {
       sum += matrix[i][j] * priorities[j];
@@ -54,6 +59,10 @@ export function calculateLambdaMax(matrix, priorities) {
  * @returns {number} - Индекс согласованности
  */
 export function calculateCI(lambdaMax, n) {
+  // Для матриц размером 1 или 2 CI не вычисляется
+  if (n <= 2) {
+    return 0;
+  }
   return (lambdaMax - n) / (n - 1);
 }
 
@@ -61,7 +70,7 @@ export function calculateCI(lambdaMax, n) {
  * Вычисляет отношение согласованности (CR)
  * @param {number} ci - Индекс согласованности
  * @param {number} n - Размерность матрицы
- * @returns {number} - Отношение согласованности
+ * @returns {object} - Отношение согласованности и флаг применимости
  */
 export function calculateCR(ci, n) {
   // Случайные индексы согласованности (RI) для разных размерностей
@@ -84,7 +93,19 @@ export function calculateCR(ci, n) {
   };
   
   const ri = RI[n] || 1.6;
-  return ri === 0 ? 0 : ci / ri;
+  
+  // Для матриц размером меньше 3 согласованность не проверяется
+  if (n < 3 || ri === 0) {
+    return {
+      cr: 0,
+      isApplicable: false
+    };
+  }
+  
+  return {
+    cr: ci / ri,
+    isApplicable: true
+  };
 }
 
 /**
@@ -97,14 +118,19 @@ export function checkConsistency(matrix) {
   const lambdaMax = calculateLambdaMax(matrix, priorities);
   const n = matrix.length;
   const ci = calculateCI(lambdaMax, n);
-  const cr = calculateCR(ci, n);
+  const crResult = calculateCR(ci, n);
+  
+  // Для матриц размером меньше 3 согласованность не проверяется
+  const cr = crResult.cr || 0;
+  const isApplicable = crResult.isApplicable !== false;
   
   return {
     priorities,
     lambdaMax,
     ci,
     cr,
-    isConsistent: cr < 0.1, // CR < 10% считается приемлемым
+    isConsistent: isApplicable ? cr < 0.1 : true, // Для матриц < 3x3 всегда согласованы
+    isApplicable, // Флаг применимости проверки согласованности
     n
   };
 }
@@ -117,12 +143,34 @@ export function checkConsistency(matrix) {
  * @returns {object} - Глобальные приоритеты и детальная информация
  */
 export function calculateGlobalPriorities(hierarchy, criteriaMatrix, alternativeMatrices) {
+  // Валидация входных данных
+  if (!hierarchy || !hierarchy.criteria || !hierarchy.alternatives) {
+    throw new Error('Неверная структура иерархии');
+  }
+  
+  if (!criteriaMatrix || criteriaMatrix.length !== hierarchy.criteria.length) {
+    throw new Error(`Несоответствие размеров: критериев ${hierarchy.criteria.length}, матрицы критериев ${criteriaMatrix?.length || 0}`);
+  }
+  
+  if (!alternativeMatrices || alternativeMatrices.length !== hierarchy.criteria.length) {
+    throw new Error(`Несоответствие размеров: критериев ${hierarchy.criteria.length}, матриц альтернатив ${alternativeMatrices?.length || 0}`);
+  }
+  
   // Приоритеты критериев
   const criteriaConsistency = checkConsistency(criteriaMatrix);
   const criteriaPriorities = criteriaConsistency.priorities;
   
+  // Проверка, что приоритеты критериев нормализованы (сумма = 1)
+  const criteriaSum = criteriaPriorities.reduce((sum, p) => sum + p, 0);
+  if (Math.abs(criteriaSum - 1.0) > 0.01) {
+    console.warn(`Предупреждение: сумма приоритетов критериев = ${criteriaSum}, ожидается 1.0`);
+  }
+  
   // Приоритеты альтернатив по каждому критерию
-  const alternativePrioritiesByCriteria = alternativeMatrices.map(matrix => {
+  const alternativePrioritiesByCriteria = alternativeMatrices.map((matrix, idx) => {
+    if (!matrix || matrix.length !== hierarchy.alternatives.length) {
+      throw new Error(`Несоответствие размеров матрицы альтернатив для критерия ${hierarchy.criteria[idx]}: альтернатив ${hierarchy.alternatives.length}, матрицы ${matrix?.length || 0}`);
+    }
     const consistency = checkConsistency(matrix);
     return {
       priorities: consistency.priorities,

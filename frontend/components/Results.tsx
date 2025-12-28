@@ -45,13 +45,13 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
 
   const chartData = results.globalPriorities.map((alt, index) => ({
     name: alt.name,
-    priority: (alt.priority * 100).toFixed(2),
+    priority: alt.priority * 100, // Числовое значение для графика
     value: alt.priority
   }))
 
   const criteriaChartData = hierarchy.criteria.map((crit, index) => ({
     name: crit,
-    priority: (results.criteriaPriorities[index] * 100).toFixed(2),
+    priority: results.criteriaPriorities[index] * 100, // Числовое значение для графика
     value: results.criteriaPriorities[index]
   }))
 
@@ -591,14 +591,23 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-gray-900">
           <h3 className="font-semibold text-gray-900 mb-2">Согласованность альтернатив</h3>
           <div className="space-y-1">
-            {results.alternativeConsistencies.map((consistency, index) => (
-              <div key={index} className="text-sm text-gray-900">
-                <span className="font-medium text-gray-900">{hierarchy.criteria[index]}:</span>{' '}
-                <span className={consistency.isConsistent ? 'text-green-600' : 'text-orange-600'}>
-                  CR = {(consistency.cr * 100).toFixed(2)}%
-                </span>
-              </div>
-            ))}
+            {results.alternativeConsistencies.map((consistency, index) => {
+              const isApplicable = consistency.isApplicable !== false;
+              return (
+                <div key={index} className="text-sm text-gray-900">
+                  <span className="font-medium text-gray-900">{hierarchy.criteria[index]}:</span>{' '}
+                  {isApplicable ? (
+                    <span className={consistency.isConsistent ? 'text-green-600' : 'text-orange-600'}>
+                      CR = {(consistency.cr * 100).toFixed(2)}%
+                    </span>
+                  ) : (
+                    <span className="text-gray-500 italic">
+                      Согласованность не применяется (матрица {consistency.n}x{consistency.n})
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -644,7 +653,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip formatter={(value: any) => `${value}%`} />
+              <Tooltip formatter={(value: any) => `${Number(value).toFixed(2)}%`} />
               <Legend />
               <Bar dataKey="priority" fill="#0ea5e9" />
             </BarChart>
@@ -659,8 +668,12 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
                 data={criteriaChartData}
                 cx="50%"
                 cy="50%"
-                labelLine={false}
-                label={({ name, priority }) => `${name}: ${priority}%`}
+                labelLine={true}
+                label={({ name, priority }) => {
+                  const percent = Number(priority).toFixed(2);
+                  // Показываем метку только если приоритет > 1%
+                  return Number(percent) > 1 ? `${name}: ${percent}%` : '';
+                }}
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
@@ -669,9 +682,35 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: any) => `${(value * 100).toFixed(2)}%`} />
+              <Tooltip 
+                formatter={(value: any, name: string, props: any) => {
+                  const percent = (Number(value) * 100).toFixed(2);
+                  return [`${percent}%`, props.payload.name];
+                }}
+              />
             </PieChart>
           </ResponsiveContainer>
+          {/* Дополнительная таблица для всех критериев */}
+          <div className="mt-4 text-sm">
+            <table className="w-full border-collapse">
+              <tbody>
+                {criteriaChartData.map((entry, index) => (
+                  <tr key={index} className="border-b border-gray-200">
+                    <td className="py-1 text-gray-900">
+                      <span 
+                        className="inline-block w-4 h-4 rounded mr-2" 
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                      {entry.name}
+                    </td>
+                    <td className="py-1 text-right font-semibold text-gray-900">
+                      {Number(entry.priority).toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
