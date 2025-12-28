@@ -119,10 +119,15 @@ export default function PairwiseComparison({
 
   const handleNext = () => {
     if (matrices && criteria && currentCriteriaIndex < criteria.length - 1) {
+      // Сохраняем текущую матрицу перед переходом к следующему критерию
+      const newMatrices = [...currentMatrices]
+      newMatrices[currentCriteriaIndex] = currentMatrix
+      setCurrentMatrices(newMatrices)
+      
       const newIndex = currentCriteriaIndex + 1
       setCurrentCriteriaIndex(newIndex)
-      const nextMatrix = currentMatrices[newIndex]
-      if (nextMatrix && nextMatrix.length > 0) {
+      const nextMatrix = newMatrices[newIndex]
+      if (nextMatrix && nextMatrix.length > 0 && nextMatrix[0] && nextMatrix[0].length > 0) {
         setCurrentMatrix(nextMatrix)
       } else {
         // Инициализируем матрицу, если она не существует
@@ -135,8 +140,11 @@ export default function PairwiseComparison({
       }
       setConsistency(null)
     } else {
+      // Сохраняем текущую матрицу перед завершением
       if (matrices && criteria) {
-        onComplete(currentMatrices)
+        const finalMatrices = [...currentMatrices]
+        finalMatrices[currentCriteriaIndex] = currentMatrix
+        onComplete(finalMatrices)
       } else {
         onComplete(currentMatrix)
       }
@@ -145,10 +153,15 @@ export default function PairwiseComparison({
 
   const handleBack = () => {
     if (matrices && criteria && currentCriteriaIndex > 0) {
+      // Сохраняем текущую матрицу перед возвратом к предыдущему критерию
+      const newMatrices = [...currentMatrices]
+      newMatrices[currentCriteriaIndex] = currentMatrix
+      setCurrentMatrices(newMatrices)
+      
       const newIndex = currentCriteriaIndex - 1
       setCurrentCriteriaIndex(newIndex)
-      const prevMatrix = currentMatrices[newIndex]
-      if (prevMatrix && prevMatrix.length > 0) {
+      const prevMatrix = newMatrices[newIndex]
+      if (prevMatrix && prevMatrix.length > 0 && prevMatrix[0] && prevMatrix[0].length > 0) {
         setCurrentMatrix(prevMatrix)
       } else {
         // Инициализируем матрицу, если она не существует
@@ -168,6 +181,20 @@ export default function PairwiseComparison({
   const currentTitle = matrices && criteria
     ? `${title} по критерию: "${criteria[currentCriteriaIndex]}"`
     : title
+
+  // Проверяем, является ли матрица единичной (все значения = 1)
+  const isMatrixUnfilled = () => {
+    if (!currentMatrix || currentMatrix.length === 0) return true
+    const n = currentMatrix.length
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i !== j && currentMatrix[i][j] !== 1) {
+          return false
+        }
+      }
+    }
+    return true
+  }
 
   return (
     <div className="space-y-6 text-gray-900">
@@ -292,6 +319,21 @@ export default function PairwiseComparison({
             Критерий {currentCriteriaIndex + 1} из {criteria.length}
           </p>
         )}
+        {isMatrixUnfilled() && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle size={20} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-amber-900 font-semibold mb-1">Важно: Заполните матрицу сравнения</p>
+                <p className="text-amber-800 text-sm">
+                  Если вы не заполните матрицу сравнения (оставите все значения равными 1), 
+                  то все элементы получат равные приоритеты, и результат будет 50/50 (или равномерно распределенным). 
+                  Пожалуйста, заполните матрицу, выбрав значения из шкалы сравнения выше.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Comparison Matrix */}
@@ -331,7 +373,7 @@ export default function PairwiseComparison({
                       </select>
                     ) : (
                       <div className="text-center text-gray-700">
-                        {currentMatrix[j]?.[i] ? (1 / currentMatrix[j][i]).toFixed(3) : '1.000'}
+                        {currentMatrix[i]?.[j] ? currentMatrix[i][j].toFixed(3) : '1.000'}
                       </div>
                     )}
                   </td>
