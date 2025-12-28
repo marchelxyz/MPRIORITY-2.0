@@ -1,22 +1,11 @@
 /**
- * Gemini Provider с автоматическим fallback между версиями моделей
- * 
- * Порядок приоритета моделей:
- * 1. gemini-2.5-flash - самая новая и быстрая
- * 2. gemini-1.5-flash - быстрая и широко доступная
- * 3. gemini-1.5-pro - более мощная модель
- * 4. gemini-pro - legacy версия для совместимости
+ * Gemini Provider - использует только gemini-2.5-flash для анализа результатов
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Порядок приоритета моделей (от высшего к низшему)
-const MODEL_PRIORITIES = [
-  'gemini-2.5-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-pro',
-  'gemini-pro'
-];
+// Используемая модель
+const MODEL_NAME = 'gemini-2.5-flash';
 
 class GeminiProvider {
   constructor(apiKey) {
@@ -32,9 +21,7 @@ class GeminiProvider {
   }
 
   /**
-   * Инициализирует провайдер, выбирая первую доступную модель
-   * При инициализации просто создает объекты моделей без проверки доступности
-   * Реальная проверка происходит при первом запросе
+   * Инициализирует провайдер с моделью gemini-2.5-flash
    */
   async initialize() {
     if (this.initialized && this.selectedModel) {
@@ -43,14 +30,10 @@ class GeminiProvider {
 
     console.log('Инициализация Gemini Provider...');
     
-    // При инициализации просто выбираем первую модель из списка приоритетов
-    // Реальная проверка доступности произойдет при первом запросе
-    const firstModel = MODEL_PRIORITIES[0];
-    this.selectedModel = this.genAI.getGenerativeModel({ model: firstModel });
-    this.selectedModelName = firstModel;
+    this.selectedModel = this.genAI.getGenerativeModel({ model: MODEL_NAME });
+    this.selectedModelName = MODEL_NAME;
     this.initialized = true;
-    console.log(`✅ Инициализирована модель по умолчанию: ${firstModel}`);
-    console.log(`ℹ️ При первом запросе будет выполнен автоматический fallback при необходимости`);
+    console.log(`✅ Инициализирована модель: ${MODEL_NAME}`);
     
     return this.selectedModel;
   }
@@ -64,97 +47,34 @@ class GeminiProvider {
       return this.selectedModel;
     }
 
-    // Пробуем инициализировать
-    try {
-      await this.initialize();
-      return this.selectedModel;
-    } catch (error) {
-      // Если инициализация не удалась, пробуем еще раз при запросе
-      console.log('Повторная попытка инициализации при запросе...');
-      return await this.initializeWithFallback();
-    }
+    // Инициализируем модель
+    await this.initialize();
+    return this.selectedModel;
   }
 
   /**
-   * Инициализация с fallback - пробует все модели по порядку при запросе
-   * Этот метод вызывается только если первая попытка использования модели не удалась
-   */
-  async initializeWithFallback() {
-    console.log('Попытка инициализации с fallback...');
-    
-    // Пробуем все модели по порядку приоритета
-    for (const modelName of MODEL_PRIORITIES) {
-      try {
-        console.log(`Попытка использования модели: ${modelName}`);
-        const model = this.genAI.getGenerativeModel({ model: modelName });
-        
-        // Сохраняем модель (проверка доступности произойдет при реальном запросе)
-        this.selectedModel = model;
-        this.selectedModelName = modelName;
-        this.initialized = true;
-        console.log(`✅ Модель ${modelName} подготовлена для использования`);
-        return model;
-      } catch (error) {
-        console.log(`❌ Ошибка при создании модели ${modelName}:`, error.message);
-        continue;
-      }
-    }
-
-    throw new Error('Не удалось создать ни одну из моделей Gemini. Проверьте API ключ.');
-  }
-
-  /**
-   * Генерирует контент с автоматическим fallback между моделями
+   * Генерирует контент используя модель gemini-2.5-flash
    */
   async generateContent(prompt) {
-    let lastError = null;
-
-    // Если модель уже выбрана, пробуем использовать её
-    if (this.selectedModel && this.initialized) {
-      try {
-        const result = await this.selectedModel.generateContent(prompt);
-        const response = await result.response;
-        return {
-          text: response.text(),
-          model: this.selectedModelName
-        };
-      } catch (error) {
-        console.log(`Ошибка при использовании модели ${this.selectedModelName}:`, error.message);
-        lastError = error;
-        // Сбрасываем выбранную модель и пробуем другую
-        this.selectedModel = null;
-        this.selectedModelName = null;
-        this.initialized = false;
-      }
+    // Убеждаемся, что модель инициализирована
+    if (!this.selectedModel || !this.initialized) {
+      await this.initialize();
     }
 
-    // Пробуем все модели по порядку
-    for (const modelName of MODEL_PRIORITIES) {
-      try {
-        console.log(`Попытка генерации с моделью: ${modelName}`);
-        const model = this.genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        
-        // Сохраняем успешную модель для следующих запросов
-        this.selectedModel = model;
-        this.selectedModelName = modelName;
-        this.initialized = true;
-        
-        console.log(`✅ Успешная генерация с моделью: ${modelName}`);
-        return {
-          text: response.text(),
-          model: modelName
-        };
-      } catch (error) {
-        console.log(`❌ Ошибка с моделью ${modelName}:`, error.message);
-        lastError = error;
-        continue;
-      }
+    try {
+      console.log(`Генерация контента с моделью: ${MODEL_NAME}`);
+      const result = await this.selectedModel.generateContent(prompt);
+      const response = await result.response;
+      
+      console.log(`✅ Успешная генерация с моделью: ${MODEL_NAME}`);
+      return {
+        text: response.text(),
+        model: MODEL_NAME
+      };
+    } catch (error) {
+      console.error(`❌ Ошибка при генерации контента с моделью ${MODEL_NAME}:`, error.message);
+      throw new Error(`Ошибка при генерации контента: ${error.message}. Проверьте настройку GEMINI_API_KEY и доступность модели ${MODEL_NAME}.`);
     }
-
-    // Если все модели не сработали
-    throw lastError || new Error('Не удалось сгенерировать контент ни с одной из моделей');
   }
 
   /**
