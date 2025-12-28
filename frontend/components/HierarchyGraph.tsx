@@ -13,24 +13,25 @@ interface HierarchyGraphProps {
 // Кастомный компонент узла для прямоугольников
 function RectangleNode({ data }: { data: { label: string } }) {
   return (
-    <div
-      style={{
-        width: '140px',
-        height: '60px',
-        backgroundColor: 'white',
-        border: '1px solid #000',
-        borderRadius: '4px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '12px',
-        fontWeight: '500',
-        textAlign: 'center',
-        padding: '4px',
-        wordWrap: 'break-word',
-        overflow: 'hidden',
-      }}
-    >
+      <div
+        style={{
+          width: '140px',
+          height: '60px',
+          backgroundColor: 'white',
+          border: '1px solid #000',
+          borderRadius: '4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '12px',
+          fontWeight: '500',
+          textAlign: 'center',
+          padding: '4px',
+          wordWrap: 'break-word',
+          overflow: 'hidden',
+          color: '#111827', // gray-900
+        }}
+      >
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
       <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
         {data.label}
@@ -123,7 +124,7 @@ export default function HierarchyGraph({ goal, criteria, alternatives }: Hierarc
   }, [goal, criteria, alternatives])
 
   return (
-    <div className="w-full h-[600px] border border-gray-200 rounded-lg bg-white">
+    <div className="w-full h-[600px] border border-gray-200 rounded-lg bg-white text-gray-900">
       <ReactFlow
         nodes={nodes}
         edges={edges}

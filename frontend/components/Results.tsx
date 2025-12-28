@@ -101,7 +101,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
       </div>
 
       {/* Hierarchy Graph */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-6 text-gray-900">
         <h3 className="text-xl font-bold text-gray-900 mb-4">Иерархический граф</h3>
         <HierarchyGraph
           goal={hierarchy.goal}
@@ -112,7 +112,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
 
       {/* Consistency Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-gray-900">
           <h3 className="font-semibold text-gray-900 mb-2">Согласованность критериев</h3>
           <div className={`flex items-center gap-2 ${results.criteriaConsistency.isConsistent ? 'text-green-600' : 'text-orange-600'}`}>
             {results.criteriaConsistency.isConsistent ? (
@@ -128,12 +128,12 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
             )}
           </div>
         </div>
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-gray-900">
           <h3 className="font-semibold text-gray-900 mb-2">Согласованность альтернатив</h3>
           <div className="space-y-1">
             {results.alternativeConsistencies.map((consistency, index) => (
-              <div key={index} className="text-sm">
-                <span className="font-medium">{hierarchy.criteria[index]}:</span>{' '}
+              <div key={index} className="text-sm text-gray-900">
+                <span className="font-medium text-gray-900">{hierarchy.criteria[index]}:</span>{' '}
                 <span className={consistency.isConsistent ? 'text-green-600' : 'text-orange-600'}>
                   CR = {(consistency.cr * 100).toFixed(2)}%
                 </span>
@@ -144,7 +144,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
       </div>
 
       {/* Ranking */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-6 text-gray-900">
         <h3 className="text-xl font-bold text-gray-900 mb-4">Ранжирование альтернатив</h3>
         <div className="space-y-3">
           {results.globalPriorities.map((alt, index) => (
@@ -177,7 +177,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 text-gray-900">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Глобальные приоритеты альтернатив</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={chartData}>
@@ -191,7 +191,7 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 text-gray-900">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Приоритеты критериев</h3>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -216,31 +216,31 @@ export default function Results({ hierarchy, results, onReset }: ResultsProps) {
       </div>
 
       {/* Detailed Table */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg p-6 text-gray-900">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Детальная таблица приоритетов</h3>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse text-gray-900">
             <thead>
               <tr className="bg-gray-50">
-                <th className="border border-gray-300 p-2 text-left">Альтернатива</th>
+                <th className="border border-gray-300 p-2 text-left text-gray-900">Альтернатива</th>
                 {hierarchy.criteria.map((crit, index) => (
-                  <th key={index} className="border border-gray-300 p-2 text-center">
+                  <th key={index} className="border border-gray-300 p-2 text-center text-gray-900">
                     {crit}
                   </th>
                 ))}
-                <th className="border border-gray-300 p-2 text-center font-semibold">Глобальный приоритет</th>
+                <th className="border border-gray-300 p-2 text-center font-semibold text-gray-900">Глобальный приоритет</th>
               </tr>
             </thead>
             <tbody>
               {hierarchy.alternatives.map((alt, altIndex) => (
                 <tr key={altIndex}>
-                  <td className="border border-gray-300 p-2 font-medium">{alt}</td>
+                  <td className="border border-gray-300 p-2 font-medium text-gray-900">{alt}</td>
                   {hierarchy.criteria.map((crit, critIndex) => (
-                    <td key={critIndex} className="border border-gray-300 p-2 text-center">
+                    <td key={critIndex} className="border border-gray-300 p-2 text-center text-gray-900">
                       {(results.alternativePrioritiesByCriteria[critIndex][altIndex] * 100).toFixed(2)}%
                     </td>
                   ))}
-                  <td className="border border-gray-300 p-2 text-center font-semibold bg-blue-50">
+                  <td className="border border-gray-300 p-2 text-center font-semibold bg-blue-50 text-gray-900">
                     {(results.globalPriorities.find(a => a.name === alt)?.priority! * 100).toFixed(2)}%
                   </td>
                 </tr>
