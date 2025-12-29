@@ -136,13 +136,29 @@ export function checkConsistency(matrix) {
 }
 
 /**
- * Вычисляет глобальные приоритеты альтернатив
+ * Вычисляет глобальные приоритеты для многоуровневой иерархии
+ * @param {object} hierarchy - Многоуровневая иерархия
+ * @param {object} matrices - Матрицы сравнения для всех уровней
+ * @returns {object} - Глобальные приоритеты и детальная информация
+ */
+export function calculateGlobalPriorities(hierarchy, criteriaMatrix, alternativeMatrices) {
+  // Проверяем, является ли это многоуровневой иерархией
+  if (hierarchy.levels && Array.isArray(hierarchy.levels)) {
+    return calculateMultiLevelPriorities(hierarchy, criteriaMatrix, alternativeMatrices);
+  }
+  
+  // Старая логика для обратной совместимости (3 уровня)
+  return calculateThreeLevelPriorities(hierarchy, criteriaMatrix, alternativeMatrices);
+}
+
+/**
+ * Вычисляет глобальные приоритеты для классической 3-уровневой иерархии
  * @param {object} hierarchy - Иерархия с критериями и альтернативами
  * @param {number[][]} criteriaMatrix - Матрица сравнения критериев
  * @param {number[][][]} alternativeMatrices - Матрицы сравнения альтернатив по каждому критерию
  * @returns {object} - Глобальные приоритеты и детальная информация
  */
-export function calculateGlobalPriorities(hierarchy, criteriaMatrix, alternativeMatrices) {
+function calculateThreeLevelPriorities(hierarchy, criteriaMatrix, alternativeMatrices) {
   // Валидация входных данных
   if (!hierarchy || !hierarchy.criteria || !hierarchy.alternatives) {
     throw new Error('Неверная структура иерархии');
@@ -209,5 +225,123 @@ export function calculateGlobalPriorities(hierarchy, criteriaMatrix, alternative
     globalPriorities: rankedAlternatives,
     alternativePrioritiesByCriteria: alternativePrioritiesByCriteria.map(ap => ap.priorities),
     criteriaPriorities
+  };
+}
+
+/**
+ * Вычисляет глобальные приоритеты для многоуровневой иерархии (рекурсивно)
+ * @param {object} hierarchy - Многоуровневая иерархия с уровнями
+ * @param {object} matrices - Матрицы сравнения для всех уровней
+ * @returns {object} - Глобальные приоритеты и детальная информация
+ */
+function calculateMultiLevelPriorities(hierarchy, criteriaMatrix, alternativeMatrices) {
+  if (!hierarchy || !hierarchy.levels || !Array.isArray(hierarchy.levels)) {
+    throw new Error('Неверная структура многоуровневой иерархии');
+  }
+  
+  const levels = hierarchy.levels;
+  if (levels.length < 2) {
+    throw new Error('Иерархия должна содержать минимум 2 уровня');
+  }
+  
+  // Используем переданные матрицы напрямую (они уже в правильном формате)
+  const allMatrices = criteriaMatrix || {};
+  
+  // Рекурсивно вычисляем приоритеты снизу вверх
+  const result = calculatePrioritiesRecursive(levels, allMatrices, 0);
+  
+  // Преобразуем результат в формат, совместимый с классической структурой
+  return {
+    criteriaConsistency: result.consistency || { cr: 0, ci: 0, isConsistent: true },
+    alternativeConsistencies: result.consistencies || [],
+    globalPriorities: result.globalPriorities || [],
+    alternativePrioritiesByCriteria: result.prioritiesByParent || [],
+    criteriaPriorities: result.priorities || []
+  };
+}
+
+
+/**
+ * Рекурсивно вычисляет приоритеты для многоуровневой иерархии
+ */
+function calculatePrioritiesRecursive(levels, matrices, currentLevelIndex) {
+  const currentLevel = levels[currentLevelIndex];
+  const isLastLevel = currentLevelIndex === levels.length - 1;
+  
+  if (isLastLevel) {
+    // Последний уровень - это альтернативы, возвращаем их приоритеты
+    const levelMatrices = matrices[`level-${currentLevelIndex}`] || [];
+    const parentLevel = levels[currentLevelIndex - 1];
+    
+    if (!Array.isArray(levelMatrices) || levelMatrices.length !== parentLevel.items.length) {
+      throw new Error(`Несоответствие количества матриц для уровня ${currentLevelIndex}: ожидается ${parentLevel.items.length}, получено ${Array.isArray(levelMatrices) ? levelMatrices.length : 'не массив'}`);
+    }
+    
+    const prioritiesByParent = levelMatrices.map((matrix, parentIdx) => {
+      if (!matrix || !Array.isArray(matrix) || matrix.length !== currentLevel.items.length) {
+        throw new Error(`Несоответствие размеров матрицы для родителя ${parentIdx} уровня ${currentLevelIndex}: ожидается ${currentLevel.items.length}x${currentLevel.items.length}, получено ${matrix ? (Array.isArray(matrix) ? `${matrix.length}x${matrix[0]?.length || 0}` : 'не массив') : 'null'}`);
+      }
+      const consistency = checkConsistency(matrix);
+      return {
+        priorities: consistency.priorities,
+        consistency: consistency
+      };
+    });
+    
+    return {
+      levelIndex: currentLevelIndex,
+      items: currentLevel.items,
+      prioritiesByParent: prioritiesByParent.map(p => p.priorities),
+      consistencies: prioritiesByParent.map(p => p.consistency),
+      globalPriorities: null // Будет вычислено на верхнем уровне
+    };
+  }
+  
+  // Промежуточный уровень - рекурсивно вычисляем приоритеты для дочерних уровней
+  const childResult = calculatePrioritiesRecursive(levels, matrices, currentLevelIndex + 1);
+  
+  // Получаем матрицу сравнения для текущего уровня
+  const levelMatrix = matrices[`level-${currentLevelIndex}`];
+  if (!levelMatrix || !Array.isArray(levelMatrix) || levelMatrix.length !== currentLevel.items.length) {
+    throw new Error(`Несоответствие размеров матрицы для уровня ${currentLevelIndex}: ожидается ${currentLevel.items.length}x${currentLevel.items.length}, получено ${levelMatrix ? (Array.isArray(levelMatrix) ? `${levelMatrix.length}x${levelMatrix[0]?.length || 0}` : 'не массив') : 'null'}`);
+  }
+  
+  const levelConsistency = checkConsistency(levelMatrix);
+  const levelPriorities = levelConsistency.priorities;
+  
+  // Вычисляем глобальные приоритеты для дочерних элементов
+  const childItems = childResult.items;
+  const globalPriorities = new Array(childItems.length).fill(0);
+  
+  // Умножаем приоритеты текущего уровня на приоритеты дочерних элементов
+  for (let i = 0; i < childItems.length; i++) {
+    for (let j = 0; j < levelPriorities.length; j++) {
+      if (childResult.prioritiesByParent && childResult.prioritiesByParent[j] && childResult.prioritiesByParent[j][i] !== undefined) {
+        globalPriorities[i] += levelPriorities[j] * childResult.prioritiesByParent[j][i];
+      }
+    }
+  }
+  
+  // Создаем результат с ранжированием
+  const rankedItems = childItems.map((item, index) => ({
+    name: item,
+    priority: globalPriorities[index],
+    rank: 0
+  }));
+  
+  rankedItems.sort((a, b) => b.priority - a.priority);
+  rankedItems.forEach((item, index) => {
+    item.rank = index + 1;
+  });
+  
+  return {
+    levelIndex: currentLevelIndex,
+    items: currentLevel.items,
+    priorities: levelPriorities,
+    consistency: levelConsistency,
+    childResult: childResult,
+    globalPriorities: rankedItems,
+    prioritiesByParent: childResult.prioritiesByParent,
+    consistencies: [levelConsistency, ...(childResult.consistencies || [])]
   };
 }

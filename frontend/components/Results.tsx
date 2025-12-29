@@ -15,6 +15,8 @@ interface ResultsProps {
     goal: string
     criteria: string[]
     alternatives: string[]
+    levels?: Array<{ name: string; items: string[] }>
+    isMultiLevel?: boolean
   }
   results: {
     criteriaConsistency: any
@@ -29,12 +31,13 @@ interface ResultsProps {
   }
   criteriaMatrix: number[][]
   alternativeMatrices: number[][][]
+  multiLevelMatrices?: Record<string, number[][] | number[][][]>
   onReset: () => void
 }
 
 const COLORS = ['#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef']
 
-export default function Results({ hierarchy, results, criteriaMatrix, alternativeMatrices, onReset }: ResultsProps) {
+export default function Results({ hierarchy, results, criteriaMatrix, alternativeMatrices, multiLevelMatrices, onReset }: ResultsProps) {
   const [analysis, setAnalysis] = useState<string | null>(null)
   const [analysisModel, setAnalysisModel] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -709,6 +712,8 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             goal={hierarchy.goal}
             criteria={hierarchy.criteria}
             alternatives={hierarchy.alternatives}
+            levels={hierarchy.levels}
+            isMultiLevel={hierarchy.isMultiLevel}
           />
         </div>
       </div>

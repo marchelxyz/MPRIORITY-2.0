@@ -1,17 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, X, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Plus, X, ArrowRight, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-react'
 import HelpTooltip from './HelpTooltip'
 
+interface HierarchyLevel {
+  name: string
+  items: string[]
+}
+
 interface HierarchyBuilderProps {
-  onComplete: (data: { goal: string; criteria: string[]; alternatives: string[] }) => void
+  onComplete: (data: { goal: string; criteria: string[]; alternatives: string[]; levels?: HierarchyLevel[]; isMultiLevel?: boolean }) => void
 }
 
 export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) {
   const [goal, setGoal] = useState('')
   const [criteria, setCriteria] = useState<string[]>([''])
   const [alternatives, setAlternatives] = useState<string[]>(['', ''])
+  const [isMultiLevel, setIsMultiLevel] = useState(false)
+  const [levels, setLevels] = useState<HierarchyLevel[]>([
+    { name: 'Критерии', items: [''] },
+    { name: 'Альтернативы', items: ['', ''] }
+  ])
 
   const addCriterion = () => {
     setCriteria([...criteria, ''])
@@ -45,30 +55,112 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
     setAlternatives(newAlternatives)
   }
 
-  const handleSubmit = () => {
-    const validCriteria = criteria.filter(c => c.trim() !== '')
-    const validAlternatives = alternatives.filter(a => a.trim() !== '')
+  const addLevel = () => {
+    setLevels([...levels, { name: `Уровень ${levels.length + 1}`, items: [''] }])
+  }
 
+  const removeLevel = (index: number) => {
+    if (levels.length > 2) {
+      setLevels(levels.filter((_, i) => i !== index))
+    }
+  }
+
+  const moveLevelUp = (index: number) => {
+    if (index > 0) {
+      const newLevels = [...levels]
+      ;[newLevels[index - 1], newLevels[index]] = [newLevels[index], newLevels[index - 1]]
+      setLevels(newLevels)
+    }
+  }
+
+  const moveLevelDown = (index: number) => {
+    if (index < levels.length - 1) {
+      const newLevels = [...levels]
+      ;[newLevels[index], newLevels[index + 1]] = [newLevels[index + 1], newLevels[index]]
+      setLevels(newLevels)
+    }
+  }
+
+  const updateLevelName = (index: number, name: string) => {
+    const newLevels = [...levels]
+    newLevels[index].name = name
+    setLevels(newLevels)
+  }
+
+  const addLevelItem = (levelIndex: number) => {
+    const newLevels = [...levels]
+    newLevels[levelIndex].items.push('')
+    setLevels(newLevels)
+  }
+
+  const removeLevelItem = (levelIndex: number, itemIndex: number) => {
+    const newLevels = [...levels]
+    if (newLevels[levelIndex].items.length > 1) {
+      newLevels[levelIndex].items = newLevels[levelIndex].items.filter((_, i) => i !== itemIndex)
+      setLevels(newLevels)
+    }
+  }
+
+  const updateLevelItem = (levelIndex: number, itemIndex: number, value: string) => {
+    const newLevels = [...levels]
+    newLevels[levelIndex].items[itemIndex] = value
+    setLevels(newLevels)
+  }
+
+  const handleSubmit = () => {
     if (!goal.trim()) {
       alert('Введите цель')
       return
     }
 
-    if (validCriteria.length < 2) {
-      alert('Добавьте минимум 2 критерия')
-      return
-    }
+    if (isMultiLevel) {
+      // Многоуровневая иерархия
+      const validLevels = levels.map(level => ({
+        name: level.name,
+        items: level.items.filter(item => item.trim() !== '')
+      }))
 
-    if (validAlternatives.length < 2) {
-      alert('Добавьте минимум 2 альтернативы')
-      return
-    }
+      // Проверка, что каждый уровень имеет минимум 2 элемента
+      for (let i = 0; i < validLevels.length; i++) {
+        if (validLevels[i].items.length < 2) {
+          alert(`Уровень "${validLevels[i].name}" должен содержать минимум 2 элемента`)
+          return
+        }
+      }
 
-    onComplete({
-      goal: goal.trim(),
-      criteria: validCriteria,
-      alternatives: validAlternatives
-    })
+      // Преобразуем в старый формат для обратной совместимости
+      const firstLevel = validLevels[0]
+      const lastLevel = validLevels[validLevels.length - 1]
+      
+      onComplete({
+        goal: goal.trim(),
+        criteria: firstLevel.items,
+        alternatives: lastLevel.items,
+        levels: validLevels,
+        isMultiLevel: true
+      })
+    } else {
+      // Классическая 3-уровневая иерархия
+      const validCriteria = criteria.filter(c => c.trim() !== '')
+      const validAlternatives = alternatives.filter(a => a.trim() !== '')
+
+      if (validCriteria.length < 2) {
+        alert('Добавьте минимум 2 критерия')
+        return
+      }
+
+      if (validAlternatives.length < 2) {
+        alert('Добавьте минимум 2 альтернативы')
+        return
+      }
+
+      onComplete({
+        goal: goal.trim(),
+        criteria: validCriteria,
+        alternatives: validAlternatives,
+        isMultiLevel: false
+      })
+    }
   }
 
   return (
@@ -210,42 +302,151 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
         </div>
       </div>
 
-      {/* Alternatives */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <label className="block text-sm font-medium text-gray-700">
-            Альтернативы <span className="text-red-500">*</span> (минимум 2)
-          </label>
-          <button
-            onClick={addAlternative}
-            className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
-          >
-            <Plus size={16} />
-            Добавить альтернативу
-          </button>
-        </div>
-        <div className="space-y-2">
-          {alternatives.map((alternative, index) => (
-            <div key={index} className="flex gap-2">
+      {/* Multi-level toggle */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer">
               <input
-                type="text"
-                value={alternative}
-                onChange={(e) => updateAlternative(index, e.target.value)}
-                placeholder={`Альтернатива ${index + 1}`}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                type="checkbox"
+                checked={isMultiLevel}
+                onChange={(e) => setIsMultiLevel(e.target.checked)}
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
               />
-              {alternatives.length > 2 && (
-                <button
-                  onClick={() => removeAlternative(index)}
-                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
-                >
-                  <X size={20} />
-                </button>
-              )}
-            </div>
-          ))}
+              <span className="text-sm font-medium text-gray-700">
+                Использовать многоуровневую иерархию (4+ уровней)
+              </span>
+            </label>
+            <p className="text-xs text-gray-600 mt-1 ml-6">
+              Позволяет создавать иерархии с произвольным количеством уровней для сложных задач
+            </p>
+          </div>
         </div>
       </div>
+
+      {isMultiLevel ? (
+        /* Multi-level hierarchy builder */
+        <div className="space-y-6">
+          {levels.map((level, levelIndex) => (
+            <div key={levelIndex} className="border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={level.name}
+                    onChange={(e) => updateLevelName(levelIndex, e.target.value)}
+                    placeholder={`Название уровня ${levelIndex + 1}`}
+                    className="px-3 py-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent font-medium"
+                  />
+                  <span className="text-xs text-gray-500">Уровень {levelIndex + 1}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => moveLevelUp(levelIndex)}
+                    disabled={levelIndex === 0}
+                    className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Переместить вверх"
+                  >
+                    <ChevronUp size={18} />
+                  </button>
+                  <button
+                    onClick={() => moveLevelDown(levelIndex)}
+                    disabled={levelIndex === levels.length - 1}
+                    className="p-1 text-gray-500 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                    title="Переместить вниз"
+                  >
+                    <ChevronDown size={18} />
+                  </button>
+                  {levels.length > 2 && (
+                    <button
+                      onClick={() => removeLevel(levelIndex)}
+                      className="p-1 text-red-500 hover:bg-red-50 rounded-lg"
+                      title="Удалить уровень"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                {level.items.map((item, itemIndex) => (
+                  <div key={itemIndex} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={item}
+                      onChange={(e) => updateLevelItem(levelIndex, itemIndex, e.target.value)}
+                      placeholder={`Элемент ${itemIndex + 1}`}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                    {level.items.length > 1 && (
+                      <button
+                        onClick={() => removeLevelItem(levelIndex, itemIndex)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                      >
+                        <X size={20} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={() => addLevelItem(levelIndex)}
+                  className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+                >
+                  <Plus size={16} />
+                  Добавить элемент
+                </button>
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={addLevel}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700"
+          >
+            <Plus size={18} />
+            Добавить уровень
+          </button>
+        </div>
+      ) : (
+        /* Classic 3-level hierarchy */
+        <>
+          {/* Alternatives */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Альтернативы <span className="text-red-500">*</span> (минимум 2)
+              </label>
+              <button
+                onClick={addAlternative}
+                className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+              >
+                <Plus size={16} />
+                Добавить альтернативу
+              </button>
+            </div>
+            <div className="space-y-2">
+              {alternatives.map((alternative, index) => (
+                <div key={index} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={alternative}
+                    onChange={(e) => updateAlternative(index, e.target.value)}
+                    placeholder={`Альтернатива ${index + 1}`}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  {alternatives.length > 2 && (
+                    <button
+                      onClick={() => removeAlternative(index)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Submit */}
       <div className="flex justify-end pt-4">

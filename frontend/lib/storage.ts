@@ -9,6 +9,8 @@ export interface SavedAnalysis {
   goal: string
   criteria: string[]
   alternatives: string[]
+  levels?: Array<{ name: string; items: string[] }>
+  isMultiLevel?: boolean
   results: {
     criteriaConsistency: any
     alternativeConsistencies: any[]
@@ -22,6 +24,7 @@ export interface SavedAnalysis {
   }
   criteriaMatrix: number[][]
   alternativeMatrices: number[][][]
+  multiLevelMatrices?: Record<string, number[][] | number[][][]>
 }
 
 /**
@@ -54,8 +57,11 @@ export async function getSavedAnalyses(): Promise<SavedAnalysis[]> {
         goal: a.goal,
         criteria: a.criteria,
         alternatives: a.alternatives,
+        levels: a.levels,
+        isMultiLevel: a.isMultiLevel,
         criteriaMatrix: a.criteriaMatrix,
         alternativeMatrices: a.alternativeMatrices,
+        multiLevelMatrices: a.multiLevelMatrices,
         results: a.results
       }))
     }
@@ -85,8 +91,11 @@ export async function saveAnalysis(analysis: Partial<SavedAnalysis> & { goal: st
         goal: analysis.goal,
         criteria: analysis.criteria,
         alternatives: analysis.alternatives,
+        levels: analysis.levels,
+        isMultiLevel: analysis.isMultiLevel,
         criteriaMatrix: analysis.criteriaMatrix,
         alternativeMatrices: analysis.alternativeMatrices,
+        multiLevelMatrices: analysis.multiLevelMatrices,
         results: analysis.results
       }),
     })
@@ -160,8 +169,11 @@ export async function getAnalysisById(id: string): Promise<SavedAnalysis | null>
       goal: data.goal,
       criteria: data.criteria,
       alternatives: data.alternatives,
+      levels: data.levels,
+      isMultiLevel: data.isMultiLevel,
       criteriaMatrix: data.criteriaMatrix,
       alternativeMatrices: data.alternativeMatrices,
+      multiLevelMatrices: data.multiLevelMatrices,
       results: data.results
     }
   } catch (error) {

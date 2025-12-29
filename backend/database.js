@@ -38,8 +38,11 @@ export async function initDatabase() {
         goal TEXT NOT NULL,
         criteria JSONB NOT NULL,
         alternatives JSONB NOT NULL,
+        levels JSONB,
+        is_multi_level BOOLEAN DEFAULT FALSE,
         criteria_matrix JSONB NOT NULL,
         alternative_matrices JSONB NOT NULL,
+        multi_level_matrices JSONB,
         results JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -122,30 +125,84 @@ export async function saveAnalysis(analysis) {
       });
     }
     
-    const result = await pool.query(`
-      INSERT INTO analyses (
-        id, timestamp, goal, criteria, alternatives,
-        criteria_matrix, alternative_matrices, results
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (id) DO UPDATE SET
-        timestamp = EXCLUDED.timestamp,
-        goal = EXCLUDED.goal,
-        criteria = EXCLUDED.criteria,
-        alternatives = EXCLUDED.alternatives,
-        criteria_matrix = EXCLUDED.criteria_matrix,
-        alternative_matrices = EXCLUDED.alternative_matrices,
-        results = COALESCE(EXCLUDED.results, analyses.results)
-      RETURNING id, timestamp
-    `, [
-      id,
-      timestamp,
-      analysis.goal,
-      JSON.stringify(analysis.criteria),
-      JSON.stringify(analysis.alternatives),
-      JSON.stringify(criteriaMatrix),
-      JSON.stringify(alternativeMatrices),
-      analysis.results ? JSON.stringify(analysis.results) : null
-    ]);
+    // Проверяем, есть ли колонки для многоуровневых иерархий (для обратной совместимости)
+    let hasMultiLevelColumns = false;
+    try {
+      const checkResult = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'analyses' AND column_name = 'levels'
+      `);
+      hasMultiLevelColumns = checkResult.rows.length > 0;
+    } catch (e) {
+      // Игнорируем ошибку
+    }
+
+    if (hasMultiLevelColumns) {
+      // Новая версия таблицы с поддержкой многоуровневых иерархий
+      const result = await pool.query(`
+        INSERT INTO analyses (
+          id, timestamp, goal, criteria, alternatives, levels, is_multi_level,
+          criteria_matrix, alternative_matrices, multi_level_matrices, results
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        ON CONFLICT (id) DO UPDATE SET
+          timestamp = EXCLUDED.timestamp,
+          goal = EXCLUDED.goal,
+          criteria = EXCLUDED.criteria,
+          alternatives = EXCLUDED.alternatives,
+          levels = EXCLUDED.levels,
+          is_multi_level = EXCLUDED.is_multi_level,
+          criteria_matrix = EXCLUDED.criteria_matrix,
+          alternative_matrices = EXCLUDED.alternative_matrices,
+          multi_level_matrices = EXCLUDED.multi_level_matrices,
+          results = COALESCE(EXCLUDED.results, analyses.results)
+        RETURNING id, timestamp
+      `, [
+        id,
+        timestamp,
+        analysis.goal,
+        JSON.stringify(analysis.criteria),
+        JSON.stringify(analysis.alternatives),
+        analysis.levels ? JSON.stringify(analysis.levels) : null,
+        analysis.isMultiLevel || false,
+        JSON.stringify(criteriaMatrix),
+        JSON.stringify(alternativeMatrices),
+        analysis.multiLevelMatrices ? JSON.stringify(analysis.multiLevelMatrices) : null,
+        analysis.results ? JSON.stringify(analysis.results) : null
+      ]);
+      
+      console.log('✅ Анализ успешно сохранен:', { id: result.rows[0].id, timestamp: result.rows[0].timestamp });
+      return { id: result.rows[0].id, timestamp: parseInt(result.rows[0].timestamp) };
+    } else {
+      // Старая версия таблицы (обратная совместимость)
+      const result = await pool.query(`
+        INSERT INTO analyses (
+          id, timestamp, goal, criteria, alternatives,
+          criteria_matrix, alternative_matrices, results
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id) DO UPDATE SET
+          timestamp = EXCLUDED.timestamp,
+          goal = EXCLUDED.goal,
+          criteria = EXCLUDED.criteria,
+          alternatives = EXCLUDED.alternatives,
+          criteria_matrix = EXCLUDED.criteria_matrix,
+          alternative_matrices = EXCLUDED.alternative_matrices,
+          results = COALESCE(EXCLUDED.results, analyses.results)
+        RETURNING id, timestamp
+      `, [
+        id,
+        timestamp,
+        analysis.goal,
+        JSON.stringify(analysis.criteria),
+        JSON.stringify(analysis.alternatives),
+        JSON.stringify(criteriaMatrix),
+        JSON.stringify(alternativeMatrices),
+        analysis.results ? JSON.stringify(analysis.results) : null
+      ]);
+      
+      console.log('✅ Анализ успешно сохранен (старая версия таблицы):', { id: result.rows[0].id, timestamp: result.rows[0].timestamp });
+      return { id: result.rows[0].id, timestamp: parseInt(result.rows[0].timestamp) };
+    }
     
     console.log('✅ Анализ успешно сохранен:', { id: result.rows[0].id, timestamp: result.rows[0].timestamp });
     return { id: result.rows[0].id, timestamp: parseInt(result.rows[0].timestamp) };
@@ -170,10 +227,25 @@ export async function getAllAnalyses(limit = 50, offset = 0) {
   }
   
   try {
+    // Проверяем наличие новых колонок
+    let hasMultiLevelColumns = false;
+    try {
+      const checkResult = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'analyses' AND column_name = 'levels'
+      `);
+      hasMultiLevelColumns = checkResult.rows.length > 0;
+    } catch (e) {
+      // Игнорируем ошибку
+    }
+
+    const columns = hasMultiLevelColumns
+      ? 'id, timestamp, goal, criteria, alternatives, levels, is_multi_level, criteria_matrix, alternative_matrices, multi_level_matrices, results, created_at'
+      : 'id, timestamp, goal, criteria, alternatives, criteria_matrix, alternative_matrices, results, created_at';
+
     const result = await pool.query(`
-      SELECT 
-        id, timestamp, goal, criteria, alternatives,
-        criteria_matrix, alternative_matrices, results, created_at
+      SELECT ${columns}
       FROM analyses
       ORDER BY timestamp DESC
       LIMIT $1 OFFSET $2
@@ -185,8 +257,11 @@ export async function getAllAnalyses(limit = 50, offset = 0) {
       goal: row.goal,
       criteria: row.criteria,
       alternatives: row.alternatives,
+      levels: row.levels || null,
+      isMultiLevel: row.is_multi_level || false,
       criteriaMatrix: row.criteria_matrix,
       alternativeMatrices: row.alternative_matrices,
+      multiLevelMatrices: row.multi_level_matrices || null,
       results: row.results,
       createdAt: row.created_at
     }));
@@ -205,10 +280,25 @@ export async function getAnalysisById(id) {
   }
   
   try {
+    // Проверяем наличие новых колонок
+    let hasMultiLevelColumns = false;
+    try {
+      const checkResult = await pool.query(`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'analyses' AND column_name = 'levels'
+      `);
+      hasMultiLevelColumns = checkResult.rows.length > 0;
+    } catch (e) {
+      // Игнорируем ошибку
+    }
+
+    const columns = hasMultiLevelColumns
+      ? 'id, timestamp, goal, criteria, alternatives, levels, is_multi_level, criteria_matrix, alternative_matrices, multi_level_matrices, results, created_at'
+      : 'id, timestamp, goal, criteria, alternatives, criteria_matrix, alternative_matrices, results, created_at';
+
     const result = await pool.query(`
-      SELECT 
-        id, timestamp, goal, criteria, alternatives,
-        criteria_matrix, alternative_matrices, results, created_at
+      SELECT ${columns}
       FROM analyses
       WHERE id = $1
     `, [id]);
@@ -224,8 +314,11 @@ export async function getAnalysisById(id) {
       goal: row.goal,
       criteria: row.criteria,
       alternatives: row.alternatives,
+      levels: row.levels || null,
+      isMultiLevel: row.is_multi_level || false,
       criteriaMatrix: row.criteria_matrix,
       alternativeMatrices: row.alternative_matrices,
+      multiLevelMatrices: row.multi_level_matrices || null,
       results: row.results,
       createdAt: row.created_at
     };

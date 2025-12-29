@@ -8,6 +8,8 @@ interface HierarchyGraphProps {
   goal: string
   criteria: string[]
   alternatives: string[]
+  levels?: Array<{ name: string; items: string[] }>
+  isMultiLevel?: boolean
 }
 
 // Кастомный компонент узла для прямоугольников
@@ -45,7 +47,7 @@ const nodeTypes = {
   rectangle: RectangleNode,
 }
 
-export default function HierarchyGraph({ goal, criteria, alternatives }: HierarchyGraphProps) {
+export default function HierarchyGraph({ goal, criteria, alternatives, levels, isMultiLevel }: HierarchyGraphProps) {
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = []
     const edges: Edge[] = []
@@ -56,72 +58,119 @@ export default function HierarchyGraph({ goal, criteria, alternatives }: Hierarc
     const nodeWidth = 140
     const nodeHeight = 60
 
-    // Верхний уровень - цель
-    const goalY = 50
-    const goalX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2
-    nodes.push({
-      id: 'goal',
-      type: 'rectangle',
-      position: { x: goalX - nodeWidth / 2, y: goalY },
-      data: { label: goal },
-    })
+    if (isMultiLevel && levels && levels.length > 0) {
+      // Многоуровневая иерархия
+      const allLevels = [
+        { name: 'Цель', items: [goal] },
+        ...levels
+      ]
 
-    // Средний уровень - критерии
-    const criteriaY = goalY + levelSpacing
-    const criteriaStartX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2 - 
-                          ((criteria.length - 1) * nodeSpacing) / 2
+      // Находим максимальное количество элементов на любом уровне для центрирования
+      const maxItems = Math.max(...allLevels.map(level => level.items.length))
 
-    criteria.forEach((criterion, index) => {
-      const x = criteriaStartX + index * nodeSpacing - nodeWidth / 2
+      allLevels.forEach((level, levelIndex) => {
+        const levelY = 50 + levelIndex * levelSpacing
+        const items = level.items
+        const itemsStartX = (maxItems * nodeSpacing) / 2 - ((items.length - 1) * nodeSpacing) / 2
+
+        items.forEach((item, itemIndex) => {
+          const x = itemsStartX + itemIndex * nodeSpacing - nodeWidth / 2
+          const nodeId = `level-${levelIndex}-item-${itemIndex}`
+          
+          nodes.push({
+            id: nodeId,
+            type: 'rectangle',
+            position: { x, y: levelY },
+            data: { label: item },
+          })
+
+          // Связи с предыдущим уровнем
+          if (levelIndex > 0) {
+            const prevLevel = allLevels[levelIndex - 1]
+            prevLevel.items.forEach((_, prevItemIndex) => {
+              const prevNodeId = `level-${levelIndex - 1}-item-${prevItemIndex}`
+              edges.push({
+                id: `${prevNodeId}-${nodeId}`,
+                source: prevNodeId,
+                target: nodeId,
+                type: 'straight',
+                style: { stroke: '#000', strokeWidth: 1 },
+                markerEnd: undefined,
+                animated: false,
+              })
+            })
+          }
+        })
+      })
+    } else {
+      // Классическая 3-уровневая иерархия
+      // Верхний уровень - цель
+      const goalY = 50
+      const goalX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2
       nodes.push({
-        id: `criteria-${index}`,
+        id: 'goal',
         type: 'rectangle',
-        position: { x, y: criteriaY },
-        data: { label: criterion },
+        position: { x: goalX - nodeWidth / 2, y: goalY },
+        data: { label: goal },
       })
 
-      // Связь от цели к критерию
-      edges.push({
-        id: `goal-criteria-${index}`,
-        source: 'goal',
-        target: `criteria-${index}`,
-        type: 'straight',
-        style: { stroke: '#000', strokeWidth: 1 },
-        markerEnd: undefined,
-        animated: false,
-      })
-    })
+      // Средний уровень - критерии
+      const criteriaY = goalY + levelSpacing
+      const criteriaStartX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2 - 
+                            ((criteria.length - 1) * nodeSpacing) / 2
 
-    // Нижний уровень - альтернативы
-    const alternativesY = criteriaY + levelSpacing
-    const alternativesStartX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2 - 
-                               ((alternatives.length - 1) * nodeSpacing) / 2
+      criteria.forEach((criterion, index) => {
+        const x = criteriaStartX + index * nodeSpacing - nodeWidth / 2
+        nodes.push({
+          id: `criteria-${index}`,
+          type: 'rectangle',
+          position: { x, y: criteriaY },
+          data: { label: criterion },
+        })
 
-    alternatives.forEach((alternative, index) => {
-      const x = alternativesStartX + index * nodeSpacing - nodeWidth / 2
-      nodes.push({
-        id: `alternative-${index}`,
-        type: 'rectangle',
-        position: { x, y: alternativesY },
-        data: { label: alternative },
-      })
-
-      // Связи от каждого критерия к каждой альтернативе
-      criteria.forEach((_, critIndex) => {
+        // Связь от цели к критерию
         edges.push({
-          id: `criteria-${critIndex}-alternative-${index}`,
-          source: `criteria-${critIndex}`,
-          target: `alternative-${index}`,
+          id: `goal-criteria-${index}`,
+          source: 'goal',
+          target: `criteria-${index}`,
           type: 'straight',
           style: { stroke: '#000', strokeWidth: 1 },
           markerEnd: undefined,
           animated: false,
         })
       })
-    })
+
+      // Нижний уровень - альтернативы
+      const alternativesY = criteriaY + levelSpacing
+      const alternativesStartX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2 - 
+                               ((alternatives.length - 1) * nodeSpacing) / 2
+
+      alternatives.forEach((alternative, index) => {
+        const x = alternativesStartX + index * nodeSpacing - nodeWidth / 2
+        nodes.push({
+          id: `alternative-${index}`,
+          type: 'rectangle',
+          position: { x, y: alternativesY },
+          data: { label: alternative },
+        })
+
+        // Связи от каждого критерия к каждой альтернативе
+        criteria.forEach((_, critIndex) => {
+          edges.push({
+            id: `criteria-${critIndex}-alternative-${index}`,
+            source: `criteria-${critIndex}`,
+            target: `alternative-${index}`,
+            type: 'straight',
+            style: { stroke: '#000', strokeWidth: 1 },
+            markerEnd: undefined,
+            animated: false,
+          })
+        })
+      })
+    }
 
     return { nodes, edges }
-  }, [goal, criteria, alternatives])
+  }, [goal, criteria, alternatives, levels, isMultiLevel])
 
   return (
     <div className="w-full h-[600px] border border-gray-200 rounded-lg bg-white text-gray-900">
