@@ -11,6 +11,8 @@ interface PairwiseComparisonProps {
   matrix?: number[][]
   matrices?: number[][][]
   criteria?: string[]
+  showFractions: boolean
+  onShowFractionsChange: (value: boolean) => void
   onComplete: (matrix: number[][] | number[][][]) => void
   onBack: () => void
 }
@@ -41,6 +43,8 @@ export default function PairwiseComparison({
   matrix,
   matrices,
   criteria,
+  showFractions,
+  onShowFractionsChange,
   onComplete,
   onBack
 }: PairwiseComparisonProps) {
@@ -49,22 +53,6 @@ export default function PairwiseComparison({
   const [currentCriteriaIndex, setCurrentCriteriaIndex] = useState(0)
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
-  
-  // Восстанавливаем состояние флажка из localStorage
-  const [showFractions, setShowFractions] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('showFractions')
-      return saved === 'true'
-    }
-    return false
-  })
-  
-  // Сохраняем состояние флажка в localStorage при изменении
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('showFractions', showFractions.toString())
-    }
-  }, [showFractions])
 
   // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
@@ -632,7 +620,7 @@ export default function PairwiseComparison({
           <input
             type="checkbox"
             checked={showFractions}
-            onChange={(e) => setShowFractions(e.target.checked)}
+            onChange={(e) => onShowFractionsChange(e.target.checked)}
             className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
           />
           <span className="text-sm text-gray-700">
