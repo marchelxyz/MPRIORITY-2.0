@@ -24,6 +24,7 @@ export default function Home() {
     levels: undefined as HierarchyLevel[] | undefined,
     isMultiLevel: false
   })
+  const [shortenedTexts, setShortenedTexts] = useState<any>(null)
   const [criteriaMatrix, setCriteriaMatrix] = useState<number[][]>([])
   const [alternativeMatrices, setAlternativeMatrices] = useState<number[][][]>([])
   const [multiLevelMatrices, setMultiLevelMatrices] = useState<Record<string, number[][] | number[][][]>>({})
@@ -48,7 +49,7 @@ export default function Home() {
 
   // Автоматическое сохранение в базу данных на каждом этапе
   const autoSave = async (
-    hierarchyData: typeof hierarchy,
+    hierarchyData: typeof hierarchy & { shortenedTexts?: any },
     criteriaMatrixData?: number[][],
     alternativeMatricesData?: number[][][],
     resultsData?: any,
@@ -81,7 +82,8 @@ export default function Home() {
         criteriaMatrix: criteriaMatrixData && criteriaMatrixData.length > 0 ? criteriaMatrixData : undefined,
         alternativeMatrices: alternativeMatricesData && alternativeMatricesData.length > 0 ? alternativeMatricesData : undefined,
         multiLevelMatrices: hierarchyData.isMultiLevel ? multiLevelMatrices : undefined,
-        results: includeResults && resultsData ? resultsData : undefined
+        results: includeResults && resultsData ? resultsData : undefined,
+        shortenedTexts: hierarchyData.shortenedTexts || shortenedTexts
       })
 
       if (savedId && !currentAnalysisId) {
@@ -97,6 +99,7 @@ export default function Home() {
 
   const handleHierarchyComplete = async (data: any) => {
     setHierarchy(data)
+    setShortenedTexts(data.shortenedTexts || null)
     
     if (data.isMultiLevel && data.levels) {
       // Многоуровневая иерархия
@@ -154,8 +157,11 @@ export default function Home() {
       setAlternativeMatrices(initAlternativeMatrices)
       setStep('criteria')
       
+      // Сохраняем shortenedTexts
+      setShortenedTexts(data.shortenedTexts || null)
+      
       // Автоматическое сохранение после создания иерархии
-      await autoSave(data, initCriteriaMatrix, initAlternativeMatrices, undefined, false)
+      await autoSave({ ...data, shortenedTexts: data.shortenedTexts }, initCriteriaMatrix, initAlternativeMatrices, undefined, false)
     }
   }
 
@@ -171,7 +177,7 @@ export default function Home() {
         setMultiLevelMatrices(updatedMatrices)
         
         // Автоматическое сохранение после заполнения первого уровня
-        await autoSave(hierarchy, undefined, undefined, undefined, false)
+        await autoSave({ ...hierarchy, shortenedTexts }, undefined, undefined, undefined, false)
         
         if (levels.length > 1) {
           // Переходим к следующему уровню
@@ -186,7 +192,7 @@ export default function Home() {
         setMultiLevelMatrices(updatedMatrices)
         
         // Автоматическое сохранение после заполнения уровня
-        await autoSave(hierarchy, undefined, undefined, undefined, false)
+        await autoSave({ ...hierarchy, shortenedTexts }, undefined, undefined, undefined, false)
         
         if (currentComparisonLevel < levels.length - 1) {
           // Переходим к следующему уровню
@@ -203,7 +209,7 @@ export default function Home() {
       setStep('alternatives')
       
       // Автоматическое сохранение после заполнения матрицы критериев
-      await autoSave(hierarchy, criteriaMatrixData, alternativeMatrices, undefined, false)
+      await autoSave({ ...hierarchy, shortenedTexts }, criteriaMatrixData, alternativeMatrices, undefined, false)
     }
   }
 
@@ -212,8 +218,8 @@ export default function Home() {
     const alternativeMatricesData = matrices as number[][][]
     setAlternativeMatrices(alternativeMatricesData)
     
-    // Автоматическое сохранение после заполнения матриц альтернатив
-    await autoSave(hierarchy, criteriaMatrix, alternativeMatricesData, undefined, false)
+      // Автоматическое сохранение после заполнения матриц альтернатив
+      await autoSave({ ...hierarchy, shortenedTexts }, criteriaMatrix, alternativeMatricesData, undefined, false)
     
     // Передаем матрицы напрямую, чтобы избежать проблемы с асинхронным обновлением состояния
     calculateResultsWithMatrices(criteriaMatrix, alternativeMatricesData)
@@ -254,7 +260,7 @@ export default function Home() {
       setStep('results')
       
       // Автоматическое сохранение после расчета результатов
-      await autoSave(hierarchy, criteriaMatrix, alternativeMatrices, data, true)
+      await autoSave({ ...hierarchy, shortenedTexts }, criteriaMatrix, alternativeMatrices, data, true)
     } catch (error) {
       console.error('❌ Ошибка при расчете результатов:', error)
       alert(`Ошибка при расчете результатов:\n\n${error instanceof Error ? error.message : 'Проверьте подключение к серверу'}`)
@@ -378,7 +384,7 @@ export default function Home() {
       setStep('results')
       
       // Автоматическое сохранение после расчета результатов
-      await autoSave(hierarchy, criteriaMatrixData, alternativeMatricesData, data, true)
+      await autoSave({ ...hierarchy, shortenedTexts }, criteriaMatrixData, alternativeMatricesData, data, true)
     } catch (error) {
       console.error('❌ Ошибка при расчете результатов:', error)
       alert(`Ошибка при расчете результатов:\n\n${error instanceof Error ? error.message : 'Проверьте подключение к серверу'}`)
@@ -409,6 +415,7 @@ export default function Home() {
     setHierarchy(loadedHierarchy)
     setCriteriaMatrix(analysis.criteriaMatrix || [])
     setAlternativeMatrices(analysis.alternativeMatrices || [])
+    setShortenedTexts(analysis.shortenedTexts || null)
     if (analysis.multiLevelMatrices) {
       setMultiLevelMatrices(analysis.multiLevelMatrices)
       // Определяем текущий уровень сравнения на основе заполненных матриц
@@ -582,6 +589,7 @@ export default function Home() {
               criteriaMatrix={criteriaMatrix}
               alternativeMatrices={alternativeMatrices}
               multiLevelMatrices={hierarchy.isMultiLevel ? multiLevelMatrices : undefined}
+              shortenedTexts={shortenedTexts}
               onReset={reset}
             />
           )}

@@ -44,10 +44,16 @@ export async function initDatabase() {
         alternative_matrices JSONB NOT NULL,
         multi_level_matrices JSONB,
         results JSONB,
+        shortened_texts JSONB,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
       
       CREATE INDEX IF NOT EXISTS idx_analyses_timestamp ON analyses(timestamp DESC);
+    `);
+    
+    // Добавляем колонку shortened_texts, если её нет (для существующих таблиц)
+    await client.query(`
+      ALTER TABLE analyses ADD COLUMN IF NOT EXISTS shortened_texts JSONB;
     `);
     
     client.release();
@@ -143,8 +149,8 @@ export async function saveAnalysis(analysis) {
       const result = await pool.query(`
         INSERT INTO analyses (
           id, timestamp, goal, criteria, alternatives, levels, is_multi_level,
-          criteria_matrix, alternative_matrices, multi_level_matrices, results
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          criteria_matrix, alternative_matrices, multi_level_matrices, results, shortened_texts
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         ON CONFLICT (id) DO UPDATE SET
           timestamp = EXCLUDED.timestamp,
           goal = EXCLUDED.goal,
@@ -155,7 +161,8 @@ export async function saveAnalysis(analysis) {
           criteria_matrix = EXCLUDED.criteria_matrix,
           alternative_matrices = EXCLUDED.alternative_matrices,
           multi_level_matrices = EXCLUDED.multi_level_matrices,
-          results = COALESCE(EXCLUDED.results, analyses.results)
+          results = COALESCE(EXCLUDED.results, analyses.results),
+          shortened_texts = EXCLUDED.shortened_texts
         RETURNING id, timestamp
       `, [
         id,
@@ -168,7 +175,8 @@ export async function saveAnalysis(analysis) {
         JSON.stringify(criteriaMatrix),
         JSON.stringify(alternativeMatrices),
         analysis.multiLevelMatrices ? JSON.stringify(analysis.multiLevelMatrices) : null,
-        analysis.results ? JSON.stringify(analysis.results) : null
+        analysis.results ? JSON.stringify(analysis.results) : null,
+        analysis.shortenedTexts ? JSON.stringify(analysis.shortenedTexts) : null
       ]);
       
       console.log('✅ Анализ успешно сохранен:', { id: result.rows[0].id, timestamp: result.rows[0].timestamp });
@@ -263,6 +271,7 @@ export async function getAllAnalyses(limit = 50, offset = 0) {
       alternativeMatrices: row.alternative_matrices,
       multiLevelMatrices: row.multi_level_matrices || null,
       results: row.results,
+      shortenedTexts: row.shortened_texts || null,
       createdAt: row.created_at
     }));
   } catch (error) {
@@ -294,7 +303,7 @@ export async function getAnalysisById(id) {
     }
 
     const columns = hasMultiLevelColumns
-      ? 'id, timestamp, goal, criteria, alternatives, levels, is_multi_level, criteria_matrix, alternative_matrices, multi_level_matrices, results, created_at'
+      ? 'id, timestamp, goal, criteria, alternatives, levels, is_multi_level, criteria_matrix, alternative_matrices, multi_level_matrices, results, shortened_texts, created_at'
       : 'id, timestamp, goal, criteria, alternatives, criteria_matrix, alternative_matrices, results, created_at';
 
     const result = await pool.query(`
@@ -320,6 +329,7 @@ export async function getAnalysisById(id) {
       alternativeMatrices: row.alternative_matrices,
       multiLevelMatrices: row.multi_level_matrices || null,
       results: row.results,
+      shortenedTexts: row.shortened_texts || null,
       createdAt: row.created_at
     };
   } catch (error) {
