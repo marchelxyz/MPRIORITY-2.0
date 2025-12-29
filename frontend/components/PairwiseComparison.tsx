@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 import HelpTooltip from './HelpTooltip'
+import { decimalToFraction } from '@/lib/fractions'
 
 interface PairwiseComparisonProps {
   title: string
@@ -40,6 +41,7 @@ export default function PairwiseComparison({
   const [currentCriteriaIndex, setCurrentCriteriaIndex] = useState(0)
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
+  const [showFractions, setShowFractions] = useState(false)
 
   // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
@@ -559,7 +561,11 @@ export default function PairwiseComparison({
                       </select>
                     ) : (
                       <div className="text-center text-gray-700">
-                        {currentMatrix[i]?.[j] ? currentMatrix[i][j].toFixed(3) : '1.000'}
+                        {currentMatrix[i]?.[j] 
+                          ? (showFractions 
+                              ? decimalToFraction(currentMatrix[i][j]) 
+                              : currentMatrix[i][j].toFixed(3))
+                          : (showFractions ? '1' : '1.000')}
                       </div>
                     )}
                   </td>
@@ -568,6 +574,21 @@ export default function PairwiseComparison({
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Fraction Conversion Toggle */}
+      <div className="flex items-center gap-2 mb-4">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showFractions}
+            onChange={(e) => setShowFractions(e.target.checked)}
+            className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+          />
+          <span className="text-sm text-gray-700">
+            Показывать дробные числа как обыкновенные дроби (например, 0.5 → 1/2)
+          </span>
+        </label>
       </div>
 
       {/* Consistency Check */}
