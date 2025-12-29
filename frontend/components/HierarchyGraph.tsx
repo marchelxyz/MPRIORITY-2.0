@@ -32,7 +32,7 @@ function RectangleNode({ data }: { data: {
   height?: number 
 } }) {
   const [showTooltip, setShowTooltip] = useState(false)
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  const [tooltipRef, setTooltipRef] = useState<HTMLDivElement | null>(null)
   
   // Используем единый размер из data, если он передан, иначе вычисляем по тексту
   const width = data.width || 140
@@ -41,13 +41,8 @@ function RectangleNode({ data }: { data: {
   const displayText = data.label
   const hasFullText = data.fullText && data.fullText !== displayText
   
-  const handleMouseEnter = (e: React.MouseEvent) => {
+  const handleMouseEnter = () => {
     if (hasFullText) {
-      const rect = e.currentTarget.getBoundingClientRect()
-      setTooltipPosition({
-        x: rect.left + rect.width / 2,
-        y: rect.top - 10
-      })
       setShowTooltip(true)
     }
   }
@@ -59,6 +54,7 @@ function RectangleNode({ data }: { data: {
   return (
     <>
       <div
+        ref={setTooltipRef}
         style={{
           width: `${width}px`,
           height: `${height}px`,
@@ -68,15 +64,15 @@ function RectangleNode({ data }: { data: {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: '12px',
+          fontSize: '11px',
           fontWeight: '500',
           textAlign: 'center',
-          padding: '8px',
+          padding: '6px',
           wordWrap: 'break-word',
           overflow: 'visible',
           color: '#111827', // gray-900
           whiteSpace: 'normal', // Разрешаем перенос текста
-          lineHeight: '1.3',
+          lineHeight: '1.2',
           boxSizing: 'border-box',
           cursor: hasFullText ? 'help' : 'default',
           position: 'relative',
@@ -93,51 +89,53 @@ function RectangleNode({ data }: { data: {
           justifyContent: 'center',
           wordBreak: 'break-word',
           whiteSpace: 'normal',
-          lineHeight: '1.3',
+          lineHeight: '1.2',
           hyphens: 'auto',
           overflowWrap: 'break-word',
         }}>
           {displayText}
         </div>
         <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
-      </div>
-      {showTooltip && hasFullText && (
-        <div
-          style={{
-            position: 'fixed',
-            left: `${tooltipPosition.x}px`,
-            top: `${tooltipPosition.y}px`,
-            transform: 'translate(-50%, -100%)',
-            backgroundColor: 'rgba(0, 0, 0, 0.9)',
-            color: 'white',
-            padding: '8px 12px',
-            borderRadius: '6px',
-            fontSize: '12px',
-            maxWidth: '300px',
-            zIndex: 1000,
-            pointerEvents: 'none',
-            whiteSpace: 'normal',
-            wordWrap: 'break-word',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
-            marginBottom: '5px',
-          }}
-        >
-          {data.fullText}
+        {showTooltip && hasFullText && (
           <div
             style={{
               position: 'absolute',
-              bottom: '-5px',
+              bottom: '100%',
               left: '50%',
               transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '5px solid rgba(0, 0, 0, 0.9)',
+              marginBottom: '8px',
+              backgroundColor: 'rgba(0, 0, 0, 0.95)',
+              color: 'white',
+              padding: '10px 14px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              maxWidth: '350px',
+              minWidth: '200px',
+              zIndex: 1000,
+              pointerEvents: 'none',
+              whiteSpace: 'normal',
+              wordWrap: 'break-word',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+              lineHeight: '1.4',
             }}
-          />
-        </div>
-      )}
+          >
+            {data.fullText}
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 0,
+                height: 0,
+                borderLeft: '8px solid transparent',
+                borderRight: '8px solid transparent',
+                borderTop: '8px solid rgba(0, 0, 0, 0.95)',
+              }}
+            />
+          </div>
+        )}
+      </div>
     </>
   )
 }
@@ -223,12 +221,12 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
     }
 
     // Вычисляем оптимальную ширину с учетом переноса текста
-    // Базовые параметры
+    // Базовые параметры - более строгие ограничения для компактности
     const minWidth = 120
-    const maxWidth = 200
-    const fontSize = 12
-    const padding = 16 // 8px с каждой стороны
-    const charWidth = fontSize * 0.6 // Примерная ширина одного символа
+    const maxWidth = 180 // Уменьшено с 200 для более компактного вида
+    const fontSize = 11 // Немного уменьшен размер шрифта
+    const padding = 12 // 6px с каждой стороны
+    const charWidth = fontSize * 0.55 // Примерная ширина одного символа
     const availableTextWidth = maxWidth - padding
     
     // Вычисляем ширину для каждого текста с учетом переноса
@@ -249,8 +247,8 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
     const unifiedWidth = Math.max(minWidth, Math.min(maxWidth, maxOptimalWidth))
     
     // Вычисляем высоту на основе количества строк текста с учетом единой ширины
-    const lineHeight = fontSize * 1.3
-    const verticalPadding = 16 // 8px сверху и снизу
+    const lineHeight = fontSize * 1.2
+    const verticalPadding = 12 // 6px сверху и снизу
     const textAreaWidth = unifiedWidth - padding
     
     const calculateHeight = (text: string): number => {
@@ -260,14 +258,16 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
       const lines = Math.max(1, Math.ceil(text.length / charsPerLine))
       // Вычисляем высоту с учетом количества строк
       const height = lines * lineHeight + verticalPadding
-      return Math.max(60, Math.min(150, height)) // Минимум 60px, максимум 150px
+      return Math.max(50, Math.min(120, height)) // Минимум 50px, максимум 120px (уменьшено)
     }
     
     const maxHeight = Math.max(...allTexts.map(calculateHeight))
     const unifiedHeight = maxHeight
 
-    // Фиксированное расстояние между узлами по горизонтали
-    const nodeSpacing = 180
+    // Увеличенное расстояние между узлами по горизонтали для лучшей читаемости
+    // Расстояние между центрами узлов = ширина узла + промежуток между узлами
+    const horizontalGap = 40 // Минимальный промежуток между узлами в пикселях
+    const nodeSpacing = unifiedWidth + horizontalGap
     const baseLevelSpacing = 200
     const levelSpacing = unifiedHeight > 80 ? baseLevelSpacing + (unifiedHeight - 80) * 1.5 : baseLevelSpacing
 
