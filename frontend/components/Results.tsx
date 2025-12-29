@@ -145,10 +145,11 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
   const generatePDF = async () => {
     setIsGeneratingPDF(true)
     try {
-      const doc = new jsPDF('p', 'mm', 'a4')
+      // Используем альбомную ориентацию (landscape)
+      const doc = new jsPDF('l', 'mm', 'a4')
       const pageWidth = doc.internal.pageSize.getWidth()
       const pageHeight = doc.internal.pageSize.getHeight()
-      const margin = 15
+      const margin = 10
       let yPos = margin
 
       // Функция для добавления текста с поддержкой кириллицы через html2canvas
@@ -157,7 +158,9 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         tempDiv.style.position = 'absolute'
         tempDiv.style.left = '-9999px'
         tempDiv.style.top = '-9999px'
-        tempDiv.style.fontSize = `${(options?.fontSize || 12) * 3.779527559}px` // конвертация из mm в px
+        // Исправляем конвертацию: 1mm = 3.779527559px, но уменьшаем размер шрифта для лучшей читаемости
+        const fontSizeInPx = (options?.fontSize || 10) * 2.834645669 // уменьшенный множитель для лучшего отображения
+        tempDiv.style.fontSize = `${fontSizeInPx}px`
         tempDiv.style.fontFamily = options?.fontFamily || 'Arial, sans-serif'
         tempDiv.style.fontWeight = options?.fontStyle === 'bold' ? 'bold' : 'normal'
         tempDiv.style.color = '#000000'
@@ -165,13 +168,13 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         tempDiv.style.width = `${(options?.maxWidth || pageWidth - 2 * margin) * 3.779527559}px`
         tempDiv.style.padding = '0'
         tempDiv.style.margin = '0'
-        tempDiv.style.lineHeight = '1.2'
+        tempDiv.style.lineHeight = '1.4'
         tempDiv.textContent = text
         document.body.appendChild(tempDiv)
         
         const canvas = await html2canvas(tempDiv, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5, // уменьшаем scale для лучшего качества
           logging: false,
           useCORS: true,
           width: tempDiv.offsetWidth,
@@ -183,105 +186,112 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         const imgWidth = (options?.maxWidth || pageWidth - 2 * margin)
         const imgHeight = (canvas.height / canvas.width) * imgWidth
         
-        if (y + imgHeight > pageHeight - 20) {
-          doc.addPage()
+        if (y + imgHeight > pageHeight - 15) {
+          doc.addPage('l')
           y = margin
         }
         
         doc.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight)
-        return y + imgHeight + 5
+        return y + imgHeight + 3
       }
 
       // Заголовок
       yPos = await addTextAsImage('MPRIORITY 2.0 - Результаты анализа', margin, yPos, {
-        fontSize: 20,
+        fontSize: 16,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin,
         fontFamily: 'Arial, sans-serif'
       })
-      yPos += 5
+      yPos += 3
 
       // Цель
       yPos = await addTextAsImage('Цель анализа:', margin, yPos, {
-        fontSize: 14,
+        fontSize: 11,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin
       })
       yPos = await addTextAsImage(hierarchy.goal, margin, yPos, {
-        fontSize: 12,
-        maxWidth: pageWidth - 2 * margin
-      })
-      yPos += 5
-
-      // Критерии и альтернативы
-      yPos = await addTextAsImage('Критерии:', margin, yPos, {
-        fontSize: 12,
-        fontStyle: 'bold',
-        maxWidth: pageWidth - 2 * margin
-      })
-      yPos = await addTextAsImage(hierarchy.criteria.join(', '), margin, yPos, {
-        fontSize: 12,
+        fontSize: 10,
         maxWidth: pageWidth - 2 * margin
       })
       yPos += 3
 
+      // Критерии и альтернативы
+      yPos = await addTextAsImage('Критерии:', margin, yPos, {
+        fontSize: 10,
+        fontStyle: 'bold',
+        maxWidth: pageWidth - 2 * margin
+      })
+      yPos = await addTextAsImage(hierarchy.criteria.join(', '), margin, yPos, {
+        fontSize: 9,
+        maxWidth: pageWidth - 2 * margin
+      })
+      yPos += 2
+
       yPos = await addTextAsImage('Альтернативы:', margin, yPos, {
-        fontSize: 12,
+        fontSize: 10,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin
       })
       yPos = await addTextAsImage(hierarchy.alternatives.join(', '), margin, yPos, {
-        fontSize: 12,
+        fontSize: 9,
         maxWidth: pageWidth - 2 * margin
       })
-      yPos += 10
+      yPos += 5
 
       // Иерархический граф
       if (hierarchyGraphRef.current) {
-        if (yPos > pageHeight - 100) {
-          doc.addPage()
+        if (yPos > pageHeight - 80) {
+          doc.addPage('l')
           yPos = margin
         }
         
         yPos = await addTextAsImage('Иерархический граф:', margin, yPos, {
-          fontSize: 14,
+          fontSize: 11,
           fontStyle: 'bold',
           maxWidth: pageWidth - 2 * margin
         })
-        yPos += 5
+        yPos += 3
 
         const graphCanvas = await html2canvas(hierarchyGraphRef.current, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5,
           logging: false,
-          useCORS: true
+          useCORS: true,
+          windowWidth: hierarchyGraphRef.current.scrollWidth,
+          windowHeight: hierarchyGraphRef.current.scrollHeight
         })
         
         const graphImgData = graphCanvas.toDataURL('image/png')
         const graphImgWidth = pageWidth - 2 * margin
         const graphImgHeight = (graphCanvas.height / graphCanvas.width) * graphImgWidth
         
-        if (yPos + graphImgHeight > pageHeight - 20) {
-          doc.addPage()
+        // Ограничиваем высоту графа, чтобы он помещался на странице
+        const maxGraphHeight = pageHeight - yPos - 20
+        const finalGraphHeight = Math.min(graphImgHeight, maxGraphHeight)
+        const finalGraphWidth = (graphCanvas.width / graphCanvas.height) * finalGraphHeight
+        
+        if (yPos + finalGraphHeight > pageHeight - 15) {
+          doc.addPage('l')
           yPos = margin
         }
         
-        doc.addImage(graphImgData, 'PNG', margin, yPos, graphImgWidth, graphImgHeight)
-        yPos += graphImgHeight + 10
+        doc.addImage(graphImgData, 'PNG', margin, yPos, finalGraphWidth, finalGraphHeight)
+        yPos += finalGraphHeight + 5
       }
 
       // Ранжирование альтернатив
-      if (yPos > pageHeight - 40) {
-        doc.addPage()
+      if (yPos > pageHeight - 30) {
+        doc.addPage('l')
         yPos = margin
       }
 
       yPos = await addTextAsImage('Ранжирование альтернатив:', margin, yPos, {
-        fontSize: 14,
+        fontSize: 11,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin
       })
-      yPos += 5
+      yPos += 3
 
       const rankingData = results.globalPriorities.map((alt, idx) => [
         alt.rank.toString(),
@@ -294,58 +304,65 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         body: rankingData,
         startY: yPos,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 10 },
+        styles: { fontSize: 9 },
         headStyles: { fillColor: [14, 165, 233], textColor: 255, fontStyle: 'bold' }
       })
 
-      yPos = (doc as any).lastAutoTable.finalY + 15
+      yPos = (doc as any).lastAutoTable.finalY + 10
 
       // График бар-чарта
       if (barChartRef.current) {
-        if (yPos > pageHeight - 100) {
-          doc.addPage()
+        if (yPos > pageHeight - 80) {
+          doc.addPage('l')
           yPos = margin
         }
         
         yPos = await addTextAsImage('Глобальные приоритеты альтернатив:', margin, yPos, {
-          fontSize: 14,
+          fontSize: 11,
           fontStyle: 'bold',
           maxWidth: pageWidth - 2 * margin
         })
-        yPos += 5
+        yPos += 3
 
         const barChartCanvas = await html2canvas(barChartRef.current, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5,
           logging: false,
-          useCORS: true
+          useCORS: true,
+          windowWidth: barChartRef.current.scrollWidth,
+          windowHeight: barChartRef.current.scrollHeight
         })
         
         const barChartImgData = barChartCanvas.toDataURL('image/png')
         const barChartImgWidth = pageWidth - 2 * margin
         const barChartImgHeight = (barChartCanvas.height / barChartCanvas.width) * barChartImgWidth
         
-        if (yPos + barChartImgHeight > pageHeight - 20) {
-          doc.addPage()
+        // Ограничиваем высоту графика
+        const maxChartHeight = pageHeight - yPos - 15
+        const finalChartHeight = Math.min(barChartImgHeight, maxChartHeight)
+        const finalChartWidth = (barChartCanvas.width / barChartCanvas.height) * finalChartHeight
+        
+        if (yPos + finalChartHeight > pageHeight - 15) {
+          doc.addPage('l')
           yPos = margin
         }
         
-        doc.addImage(barChartImgData, 'PNG', margin, yPos, barChartImgWidth, barChartImgHeight)
-        yPos += barChartImgHeight + 10
+        doc.addImage(barChartImgData, 'PNG', margin, yPos, finalChartWidth, finalChartHeight)
+        yPos += finalChartHeight + 5
       }
 
       // Приоритеты критериев
-      if (yPos > pageHeight - 40) {
-        doc.addPage()
+      if (yPos > pageHeight - 30) {
+        doc.addPage('l')
         yPos = margin
       }
 
       yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
-        fontSize: 14,
+        fontSize: 11,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin
       })
-      yPos += 5
+      yPos += 3
 
       const criteriaData = hierarchy.criteria.map((crit, idx) => [
         crit,
@@ -357,58 +374,65 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         body: criteriaData,
         startY: yPos,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 10 },
+        styles: { fontSize: 9 },
         headStyles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: 'bold' }
       })
 
-      yPos = (doc as any).lastAutoTable.finalY + 15
+      yPos = (doc as any).lastAutoTable.finalY + 10
 
       // График пирога
       if (pieChartRef.current) {
-        if (yPos > pageHeight - 100) {
-          doc.addPage()
+        if (yPos > pageHeight - 80) {
+          doc.addPage('l')
           yPos = margin
         }
         
         yPos = await addTextAsImage('Приоритеты критериев (график):', margin, yPos, {
-          fontSize: 14,
+          fontSize: 11,
           fontStyle: 'bold',
           maxWidth: pageWidth - 2 * margin
         })
-        yPos += 5
+        yPos += 3
 
         const pieChartCanvas = await html2canvas(pieChartRef.current, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5,
           logging: false,
-          useCORS: true
+          useCORS: true,
+          windowWidth: pieChartRef.current.scrollWidth,
+          windowHeight: pieChartRef.current.scrollHeight
         })
         
         const pieChartImgData = pieChartCanvas.toDataURL('image/png')
         const pieChartImgWidth = pageWidth - 2 * margin
         const pieChartImgHeight = (pieChartCanvas.height / pieChartCanvas.width) * pieChartImgWidth
         
-        if (yPos + pieChartImgHeight > pageHeight - 20) {
-          doc.addPage()
+        // Ограничиваем высоту графика
+        const maxPieHeight = pageHeight - yPos - 15
+        const finalPieHeight = Math.min(pieChartImgHeight, maxPieHeight)
+        const finalPieWidth = (pieChartCanvas.width / pieChartCanvas.height) * finalPieHeight
+        
+        if (yPos + finalPieHeight > pageHeight - 15) {
+          doc.addPage('l')
           yPos = margin
         }
         
-        doc.addImage(pieChartImgData, 'PNG', margin, yPos, pieChartImgWidth, pieChartImgHeight)
-        yPos += pieChartImgHeight + 10
+        doc.addImage(pieChartImgData, 'PNG', margin, yPos, finalPieWidth, finalPieHeight)
+        yPos += finalPieHeight + 5
       }
 
       // Детальная таблица приоритетов
-      if (yPos > pageHeight - 60) {
-        doc.addPage()
+      if (yPos > pageHeight - 50) {
+        doc.addPage('l')
         yPos = margin
       }
 
       yPos = await addTextAsImage('Детальная таблица приоритетов:', margin, yPos, {
-        fontSize: 14,
+        fontSize: 11,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin
       })
-      yPos += 5
+      yPos += 3
 
       const detailTableData = hierarchy.alternatives.map((alt, altIndex) => {
         const row: any[] = [alt]
@@ -427,67 +451,67 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         body: detailTableData,
         startY: yPos,
         margin: { left: margin, right: margin },
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold' },
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold', fontSize: 8 },
         columnStyles: {
-          0: { cellWidth: 50 },
+          0: { cellWidth: 40 },
           [detailTableHeaders.length - 1]: { fontStyle: 'bold', fillColor: [219, 234, 254] }
         }
       })
 
-      yPos = (doc as any).lastAutoTable.finalY + 15
+      yPos = (doc as any).lastAutoTable.finalY + 10
 
       // Согласованность
-      if (yPos > pageHeight - 40) {
-        doc.addPage()
+      if (yPos > pageHeight - 30) {
+        doc.addPage('l')
         yPos = margin
       }
 
       yPos = await addTextAsImage('Согласованность суждений:', margin, yPos, {
-        fontSize: 14,
+        fontSize: 11,
         fontStyle: 'bold',
         maxWidth: pageWidth - 2 * margin
       })
-      yPos += 5
+      yPos += 3
 
       const criteriaConsistencyText = `Критерии: CR = ${(results.criteriaConsistency.cr * 100).toFixed(2)}% ${results.criteriaConsistency.isConsistent ? '(приемлемо)' : '(низкая согласованность)'}`
       yPos = await addTextAsImage(criteriaConsistencyText, margin, yPos, {
-        fontSize: 11,
+        fontSize: 9,
         maxWidth: pageWidth - 2 * margin
       })
 
       for (let idx = 0; idx < results.alternativeConsistencies.length; idx++) {
         const cons = results.alternativeConsistencies[idx]
-        if (yPos > pageHeight - 20) {
-          doc.addPage()
+        if (yPos > pageHeight - 15) {
+          doc.addPage('l')
           yPos = margin
         }
         const altConsistencyText = `${hierarchy.criteria[idx]}: CR = ${(cons.cr * 100).toFixed(2)}% ${cons.isConsistent ? '(приемлемо)' : '(низкая согласованность)'}`
         yPos = await addTextAsImage(altConsistencyText, margin, yPos, {
-          fontSize: 11,
+          fontSize: 9,
           maxWidth: pageWidth - 2 * margin
         })
       }
 
       // Детальный анализ от Gemini (если есть)
       if (analysis) {
-        if (yPos > pageHeight - 40) {
-          doc.addPage()
+        if (yPos > pageHeight - 30) {
+          doc.addPage('l')
           yPos = margin
         }
 
-        yPos += 5
+        yPos += 3
         yPos = await addTextAsImage('Детальный анализ результатов:', margin, yPos, {
-          fontSize: 14,
+          fontSize: 11,
           fontStyle: 'bold',
           maxWidth: pageWidth - 2 * margin
         })
-        yPos += 5
+        yPos += 3
 
         // Убираем markdown разметку для простого текста
         const plainAnalysis = analysis.replace(/#{1,6}\s/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
         yPos = await addTextAsImage(plainAnalysis, margin, yPos, {
-          fontSize: 10,
+          fontSize: 8,
           maxWidth: pageWidth - 2 * margin
         })
       }
@@ -504,7 +528,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         footerDiv.style.position = 'absolute'
         footerDiv.style.left = '-9999px'
         footerDiv.style.top = '-9999px'
-        footerDiv.style.fontSize = '8px'
+        footerDiv.style.fontSize = '7px'
         footerDiv.style.fontFamily = 'Arial, sans-serif'
         footerDiv.style.color = '#000000'
         footerDiv.style.textAlign = 'center'
@@ -515,7 +539,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         
         const footerCanvas = await html2canvas(footerDiv, {
           backgroundColor: '#ffffff',
-          scale: 2,
+          scale: 1.5,
           logging: false,
           useCORS: true
         })
@@ -524,7 +548,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         const footerImgData = footerCanvas.toDataURL('image/png')
         const footerImgWidth = pageWidth - 2 * margin
         const footerImgHeight = (footerCanvas.height / footerCanvas.width) * footerImgWidth
-        doc.addImage(footerImgData, 'PNG', margin, pageHeight - footerImgHeight - 5, footerImgWidth, footerImgHeight)
+        doc.addImage(footerImgData, 'PNG', margin, pageHeight - footerImgHeight - 3, footerImgWidth, footerImgHeight)
       }
 
       doc.save(`mpriority-results-${Date.now()}.pdf`)
