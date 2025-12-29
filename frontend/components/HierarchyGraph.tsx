@@ -1,8 +1,18 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import ReactFlow, { Node, Edge, Background, Controls, MiniMap, Handle, Position } from 'reactflow'
 import 'reactflow/dist/style.css'
+
+interface ShortenedTexts {
+  goal?: { original: string; shortened: string }
+  criteria?: { original: string; shortened: string }[]
+  alternatives?: { original: string; shortened: string }[]
+  levels?: Array<{
+    name: { original: string; shortened: string }
+    items: { original: string; shortened: string }[]
+  }>
+}
 
 interface HierarchyGraphProps {
   goal: string
@@ -11,15 +21,43 @@ interface HierarchyGraphProps {
   levels?: Array<{ name: string; items: string[] }>
   isMultiLevel?: boolean
   hideControls?: boolean // Для скрытия элементов управления при экспорте в PDF
+  shortenedTexts?: ShortenedTexts
 }
 
 // Кастомный компонент узла для прямоугольников
-function RectangleNode({ data }: { data: { label: string; width?: number; height?: number } }) {
+function RectangleNode({ data }: { data: { 
+  label: string
+  fullText?: string
+  width?: number
+  height?: number 
+} }) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  
   // Используем единый размер из data, если он передан, иначе вычисляем по тексту
   const width = data.width || 140
   const height = data.height || 60
   
+  const displayText = data.label
+  const hasFullText = data.fullText && data.fullText !== displayText
+  
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (hasFullText) {
+      const rect = e.currentTarget.getBoundingClientRect()
+      setTooltipPosition({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 10
+      })
+      setShowTooltip(true)
+    }
+  }
+  
+  const handleMouseLeave = () => {
+    setShowTooltip(false)
+  }
+  
   return (
+    <>
       <div
         style={{
           width: `${width}px`,
@@ -40,25 +78,67 @@ function RectangleNode({ data }: { data: { label: string; width?: number; height
           whiteSpace: 'normal', // Разрешаем перенос текста
           lineHeight: '1.3',
           boxSizing: 'border-box',
+          cursor: hasFullText ? 'help' : 'default',
+          position: 'relative',
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
-      <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
-      <div style={{ 
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        wordBreak: 'break-word',
-        whiteSpace: 'normal',
-        lineHeight: '1.3',
-        hyphens: 'auto',
-        overflowWrap: 'break-word',
-      }}>
-        {data.label}
+        <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
+        <div style={{ 
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          wordBreak: 'break-word',
+          whiteSpace: 'normal',
+          lineHeight: '1.3',
+          hyphens: 'auto',
+          overflowWrap: 'break-word',
+        }}>
+          {displayText}
+        </div>
+        <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
-    </div>
+      {showTooltip && hasFullText && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+            transform: 'translate(-50%, -100%)',
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            maxWidth: '300px',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            whiteSpace: 'normal',
+            wordWrap: 'break-word',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)',
+            marginBottom: '5px',
+          }}
+        >
+          {data.fullText}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '-5px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '5px solid transparent',
+              borderRight: '5px solid transparent',
+              borderTop: '5px solid rgba(0, 0, 0, 0.9)',
+            }}
+          />
+        </div>
+      )}
+    </>
   )
 }
 
@@ -66,22 +146,80 @@ const nodeTypes = {
   rectangle: RectangleNode,
 }
 
-export default function HierarchyGraph({ goal, criteria, alternatives, levels, isMultiLevel, hideControls = false }: HierarchyGraphProps) {
+export default function HierarchyGraph({ goal, criteria, alternatives, levels, isMultiLevel, hideControls = false, shortenedTexts }: HierarchyGraphProps) {
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = []
     const edges: Edge[] = []
 
-    // Собираем все тексты для вычисления оптимального размера
+    // Вспомогательная функция для получения сокращенного текста
+    const getShortenedText = (original: string, type: 'goal' | 'criterion' | 'alternative' | 'level-name' | 'level-item', levelIndex?: number, itemIndex?: number): string => {
+      if (!shortenedTexts) return original.toUpperCase()
+      
+      switch (type) {
+        case 'goal':
+          return shortenedTexts.goal?.shortened || original.toUpperCase()
+        case 'criterion':
+          const critIdx = criteria.indexOf(original)
+          return shortenedTexts.criteria?.[critIdx]?.shortened || original.toUpperCase()
+        case 'alternative':
+          const altIdx = alternatives.indexOf(original)
+          return shortenedTexts.alternatives?.[altIdx]?.shortened || original.toUpperCase()
+        case 'level-name':
+          if (levelIndex !== undefined && shortenedTexts.levels?.[levelIndex]) {
+            return shortenedTexts.levels[levelIndex].name.shortened || original.toUpperCase()
+          }
+          return original.toUpperCase()
+        case 'level-item':
+          if (levelIndex !== undefined && itemIndex !== undefined && shortenedTexts.levels?.[levelIndex]) {
+            return shortenedTexts.levels[levelIndex].items[itemIndex]?.shortened || original.toUpperCase()
+          }
+          return original.toUpperCase()
+        default:
+          return original.toUpperCase()
+      }
+    }
+    
+    // Вспомогательная функция для получения полного текста
+    const getFullText = (original: string, type: 'goal' | 'criterion' | 'alternative' | 'level-name' | 'level-item', levelIndex?: number, itemIndex?: number): string => {
+      if (!shortenedTexts) return original
+      
+      switch (type) {
+        case 'goal':
+          return shortenedTexts.goal?.original || original
+        case 'criterion':
+          const critIdx = criteria.indexOf(original)
+          return shortenedTexts.criteria?.[critIdx]?.original || original
+        case 'alternative':
+          const altIdx = alternatives.indexOf(original)
+          return shortenedTexts.alternatives?.[altIdx]?.original || original
+        case 'level-name':
+          if (levelIndex !== undefined && shortenedTexts.levels?.[levelIndex]) {
+            return shortenedTexts.levels[levelIndex].name.original || original
+          }
+          return original
+        case 'level-item':
+          if (levelIndex !== undefined && itemIndex !== undefined && shortenedTexts.levels?.[levelIndex]) {
+            return shortenedTexts.levels[levelIndex].items[itemIndex]?.original || original
+          }
+          return original
+        default:
+          return original
+      }
+    }
+    
+    // Собираем все сокращенные тексты для вычисления оптимального размера
     const allTexts: string[] = []
     if (isMultiLevel && levels && levels.length > 0) {
-      allTexts.push(goal)
-      levels.forEach(level => {
-        level.items.forEach(item => allTexts.push(item))
+      allTexts.push(getShortenedText(goal, 'goal'))
+      levels.forEach((level, levelIdx) => {
+        level.items.forEach((item, itemIdx) => {
+          allTexts.push(getShortenedText(item, 'level-item', levelIdx, itemIdx))
+        })
       })
     } else {
-      allTexts.push(goal)
-      criteria.forEach(c => allTexts.push(c))
-      alternatives.forEach(a => allTexts.push(a))
+      allTexts.push(getShortenedText(goal, 'goal'))
+      criteria.forEach(c => allTexts.push(getShortenedText(c, 'criterion')))
+      alternatives.forEach(a => allTexts.push(getShortenedText(a, 'alternative')))
     }
 
     // Вычисляем оптимальную ширину с учетом переноса текста
@@ -154,12 +292,18 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
         items.forEach((item, itemIndex) => {
           const x = itemsStartX + itemIndex * nodeSpacing - unifiedWidth / 2
           const nodeId = `level-${levelIndex}-item-${itemIndex}`
+          const shortenedLabel = getShortenedText(item, 'level-item', levelIndex, itemIndex)
+          const fullText = getFullText(item, 'level-item', levelIndex, itemIndex)
           
           nodes.push({
             id: nodeId,
             type: 'rectangle',
             position: { x, y: levelY },
-            data: { label: item, ...nodeSize },
+            data: { 
+              label: shortenedLabel,
+              fullText: fullText !== shortenedLabel ? fullText : undefined,
+              ...nodeSize 
+            },
           })
 
           // Связи с предыдущим уровнем
@@ -185,11 +329,17 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
       // Верхний уровень - цель
       const goalY = 50
       const goalX = (Math.max(criteria.length, alternatives.length) * nodeSpacing) / 2
+      const shortenedGoal = getShortenedText(goal, 'goal')
+      const fullGoalText = getFullText(goal, 'goal')
       nodes.push({
         id: 'goal',
         type: 'rectangle',
         position: { x: goalX - unifiedWidth / 2, y: goalY },
-        data: { label: goal, ...nodeSize },
+        data: { 
+          label: shortenedGoal,
+          fullText: fullGoalText !== shortenedGoal ? fullGoalText : undefined,
+          ...nodeSize 
+        },
       })
 
       // Средний уровень - критерии
@@ -199,11 +349,17 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
 
       criteria.forEach((criterion, index) => {
         const x = criteriaStartX + index * nodeSpacing - unifiedWidth / 2
+        const shortenedCriterion = getShortenedText(criterion, 'criterion')
+        const fullCriterionText = getFullText(criterion, 'criterion')
         nodes.push({
           id: `criteria-${index}`,
           type: 'rectangle',
           position: { x, y: criteriaY },
-          data: { label: criterion, ...nodeSize },
+          data: { 
+            label: shortenedCriterion,
+            fullText: fullCriterionText !== shortenedCriterion ? fullCriterionText : undefined,
+            ...nodeSize 
+          },
         })
 
         // Связь от цели к критерию
@@ -225,11 +381,17 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
 
       alternatives.forEach((alternative, index) => {
         const x = alternativesStartX + index * nodeSpacing - unifiedWidth / 2
+        const shortenedAlternative = getShortenedText(alternative, 'alternative')
+        const fullAlternativeText = getFullText(alternative, 'alternative')
         nodes.push({
           id: `alternative-${index}`,
           type: 'rectangle',
           position: { x, y: alternativesY },
-          data: { label: alternative, ...nodeSize },
+          data: { 
+            label: shortenedAlternative,
+            fullText: fullAlternativeText !== shortenedAlternative ? fullAlternativeText : undefined,
+            ...nodeSize 
+          },
         })
 
         // Связи от каждого критерия к каждой альтернативе
@@ -248,7 +410,7 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
     }
 
     return { nodes, edges }
-  }, [goal, criteria, alternatives, levels, isMultiLevel])
+  }, [goal, criteria, alternatives, levels, isMultiLevel, shortenedTexts])
 
   return (
     <div className="w-full h-[600px] border border-gray-200 rounded-lg bg-white text-gray-900">

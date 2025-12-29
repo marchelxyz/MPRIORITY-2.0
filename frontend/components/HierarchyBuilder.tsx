@@ -1,16 +1,34 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, X, ArrowRight, CheckCircle2, ChevronUp, ChevronDown } from 'lucide-react'
 import HelpTooltip from './HelpTooltip'
+import { shortenText, debounce } from '@/lib/textShortener'
 
 interface HierarchyLevel {
   name: string
   items: string[]
 }
 
+interface ShortenedTexts {
+  goal?: { original: string; shortened: string }
+  criteria?: { original: string; shortened: string }[]
+  alternatives?: { original: string; shortened: string }[]
+  levels?: Array<{
+    name: { original: string; shortened: string }
+    items: { original: string; shortened: string }[]
+  }>
+}
+
 interface HierarchyBuilderProps {
-  onComplete: (data: { goal: string; criteria: string[]; alternatives: string[]; levels?: HierarchyLevel[]; isMultiLevel?: boolean }) => void
+  onComplete: (data: { 
+    goal: string
+    criteria: string[]
+    alternatives: string[]
+    levels?: HierarchyLevel[]
+    isMultiLevel?: boolean
+    shortenedTexts?: ShortenedTexts
+  }) => void
 }
 
 export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) {
@@ -22,6 +40,31 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
     { name: 'Критерии', items: [''] },
     { name: 'Альтернативы', items: ['', ''] }
   ])
+  
+  // Хранилище сокращенных текстов
+  const [shortenedTexts, setShortenedTexts] = useState<ShortenedTexts>({})
+  
+  // Ref для отслеживания активных запросов
+  const activeRequestsRef = useRef<Set<string>>(new Set())
+  
+  // Debounced функция для сокращения текста
+  const debouncedShorten = useRef(
+    debounce(async (key: string, text: string, updateFn: (shortened: string) => void) => {
+      if (!text || text.trim() === '' || activeRequestsRef.current.has(key)) {
+        return
+      }
+      
+      activeRequestsRef.current.add(key)
+      try {
+        const shortened = await shortenText(text)
+        updateFn(shortened)
+      } catch (error) {
+        console.error('Ошибка при сокращении текста:', error)
+      } finally {
+        activeRequestsRef.current.delete(key)
+      }
+    }, 1000) // Задержка 1 секунда
+  ).current
 
   const addCriterion = () => {
     setCriteria([...criteria, ''])
@@ -37,6 +80,32 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
     const newCriteria = [...criteria]
     newCriteria[index] = value
     setCriteria(newCriteria)
+    
+    // Сокращаем текст асинхронно
+    if (value.trim()) {
+      debouncedShorten(`criteria-${index}`, value, (shortened) => {
+        setShortenedTexts(prev => {
+          const currentCriteria = prev.criteria || criteria.map(c => ({ original: c, shortened: c.toUpperCase() }))
+          const newCriteria = [...currentCriteria]
+          if (!newCriteria[index] || newCriteria[index].original !== value) {
+            newCriteria[index] = { original: value, shortened: shortened || value.toUpperCase() }
+          } else {
+            newCriteria[index] = { ...newCriteria[index], shortened }
+          }
+          return { ...prev, criteria: newCriteria }
+        })
+      })
+    } else {
+      // Очищаем сокращенный текст при очистке поля
+      setShortenedTexts(prev => {
+        const currentCriteria = prev.criteria || []
+        const newCriteria = [...currentCriteria]
+        if (newCriteria[index]) {
+          newCriteria[index] = { original: '', shortened: '' }
+        }
+        return { ...prev, criteria: newCriteria }
+      })
+    }
   }
 
   const addAlternative = () => {
@@ -53,6 +122,32 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
     const newAlternatives = [...alternatives]
     newAlternatives[index] = value
     setAlternatives(newAlternatives)
+    
+    // Сокращаем текст асинхронно
+    if (value.trim()) {
+      debouncedShorten(`alternative-${index}`, value, (shortened) => {
+        setShortenedTexts(prev => {
+          const currentAlternatives = prev.alternatives || alternatives.map(a => ({ original: a, shortened: a.toUpperCase() }))
+          const newAlternatives = [...currentAlternatives]
+          if (!newAlternatives[index] || newAlternatives[index].original !== value) {
+            newAlternatives[index] = { original: value, shortened: shortened || value.toUpperCase() }
+          } else {
+            newAlternatives[index] = { ...newAlternatives[index], shortened }
+          }
+          return { ...prev, alternatives: newAlternatives }
+        })
+      })
+    } else {
+      // Очищаем сокращенный текст при очистке поля
+      setShortenedTexts(prev => {
+        const currentAlternatives = prev.alternatives || []
+        const newAlternatives = [...currentAlternatives]
+        if (newAlternatives[index]) {
+          newAlternatives[index] = { original: '', shortened: '' }
+        }
+        return { ...prev, alternatives: newAlternatives }
+      })
+    }
   }
 
   const addLevel = () => {
@@ -85,6 +180,28 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
     const newLevels = [...levels]
     newLevels[index].name = name
     setLevels(newLevels)
+    
+    // Сокращаем текст асинхронно
+    if (name.trim()) {
+      debouncedShorten(`level-name-${index}`, name, (shortened) => {
+        setShortenedTexts(prev => {
+          const currentLevels = prev.levels || levels.map(l => ({ 
+            name: { original: l.name, shortened: l.name.toUpperCase() }, 
+            items: l.items.map(item => ({ original: item, shortened: item.toUpperCase() }))
+          }))
+          const newLevels = [...currentLevels]
+          if (!newLevels[index]) {
+            newLevels[index] = { name: { original: name, shortened: shortened || name.toUpperCase() }, items: [] }
+          } else {
+            newLevels[index] = { 
+              ...newLevels[index], 
+              name: { original: name, shortened: shortened || name.toUpperCase() }
+            }
+          }
+          return { ...prev, levels: newLevels }
+        })
+      })
+    }
   }
 
   const addLevelItem = (levelIndex: number) => {
@@ -105,6 +222,41 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
     const newLevels = [...levels]
     newLevels[levelIndex].items[itemIndex] = value
     setLevels(newLevels)
+    
+    // Сокращаем текст асинхронно
+    if (value.trim()) {
+      debouncedShorten(`level-${levelIndex}-item-${itemIndex}`, value, (shortened) => {
+        setShortenedTexts(prev => {
+          const currentLevels = prev.levels || levels.map(l => ({ 
+            name: { original: l.name, shortened: l.name.toUpperCase() }, 
+            items: l.items.map(item => ({ original: item, shortened: item.toUpperCase() }))
+          }))
+          const newLevels = [...currentLevels]
+          if (!newLevels[levelIndex]) {
+            newLevels[levelIndex] = { 
+              name: { original: levels[levelIndex].name, shortened: levels[levelIndex].name.toUpperCase() }, 
+              items: []
+            }
+          }
+          if (!newLevels[levelIndex].items[itemIndex] || newLevels[levelIndex].items[itemIndex].original !== value) {
+            newLevels[levelIndex].items[itemIndex] = { original: value, shortened: shortened || value.toUpperCase() }
+          } else {
+            newLevels[levelIndex].items[itemIndex] = { ...newLevels[levelIndex].items[itemIndex], shortened }
+          }
+          return { ...prev, levels: newLevels }
+        })
+      })
+    } else {
+      // Очищаем сокращенный текст при очистке поля
+      setShortenedTexts(prev => {
+        const currentLevels = prev.levels || []
+        const newLevels = [...currentLevels]
+        if (newLevels[levelIndex]?.items[itemIndex]) {
+          newLevels[levelIndex].items[itemIndex] = { original: '', shortened: '' }
+        }
+        return { ...prev, levels: newLevels }
+      })
+    }
   }
 
   const handleSubmit = () => {
@@ -132,12 +284,31 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
       const firstLevel = validLevels[0]
       const lastLevel = validLevels[validLevels.length - 1]
       
+      // Собираем сокращенные тексты для многоуровневой иерархии
+      const shortenedLevels = validLevels.map((level, idx) => {
+        const shortenedLevel = shortenedTexts.levels?.[idx]
+        return {
+          name: {
+            original: level.name,
+            shortened: shortenedLevel?.name?.shortened || level.name.toUpperCase()
+          },
+          items: level.items.map((item, itemIdx) => ({
+            original: item,
+            shortened: shortenedLevel?.items[itemIdx]?.shortened || item.toUpperCase()
+          }))
+        }
+      })
+      
       onComplete({
         goal: goal.trim(),
         criteria: firstLevel.items,
         alternatives: lastLevel.items,
         levels: validLevels,
-        isMultiLevel: true
+        isMultiLevel: true,
+        shortenedTexts: {
+          goal: shortenedTexts.goal || { original: goal.trim(), shortened: goal.trim().toUpperCase() },
+          levels: shortenedLevels
+        }
       })
     } else {
       // Классическая 3-уровневая иерархия
@@ -154,11 +325,27 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
         return
       }
 
+      // Собираем сокращенные тексты для классической иерархии
+      const shortenedCriteria = validCriteria.map((c, idx) => {
+        const originalIdx = criteria.indexOf(c)
+        return shortenedTexts.criteria?.[originalIdx] || { original: c, shortened: c.toUpperCase() }
+      })
+      
+      const shortenedAlternatives = validAlternatives.map((a, idx) => {
+        const originalIdx = alternatives.indexOf(a)
+        return shortenedTexts.alternatives?.[originalIdx] || { original: a, shortened: a.toUpperCase() }
+      })
+      
       onComplete({
         goal: goal.trim(),
         criteria: validCriteria,
         alternatives: validAlternatives,
-        isMultiLevel: false
+        isMultiLevel: false,
+        shortenedTexts: {
+          goal: shortenedTexts.goal || { original: goal.trim(), shortened: goal.trim().toUpperCase() },
+          criteria: shortenedCriteria,
+          alternatives: shortenedAlternatives
+        }
       })
     }
   }
@@ -259,7 +446,22 @@ export default function HierarchyBuilder({ onComplete }: HierarchyBuilderProps) 
         <input
           type="text"
           value={goal}
-          onChange={(e) => setGoal(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value
+            setGoal(value)
+            // Сокращаем текст асинхронно
+            if (value.trim()) {
+              debouncedShorten('goal', value, (shortened) => {
+                setShortenedTexts(prev => ({ 
+                  ...prev, 
+                  goal: { original: value, shortened: shortened || value.toUpperCase() } 
+                }))
+              })
+            } else {
+              // Очищаем сокращенный текст при очистке поля
+              setShortenedTexts(prev => ({ ...prev, goal: undefined }))
+            }
+          }}
           placeholder="Например: Выбор ноутбука"
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
         />

@@ -150,6 +150,52 @@ app.post('/api/calculate-global-priorities', (req, res) => {
   }
 });
 
+// Сокращение текста до 1-4 слов с помощью Gemini
+app.post('/api/shorten-text', async (req, res) => {
+  try {
+    const { text } = req.body;
+    
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+      return res.status(400).json({ error: 'Текст обязателен и не может быть пустым' });
+    }
+
+    // Если текст уже короткий (до 4 слов), возвращаем его как есть
+    const words = text.trim().split(/\s+/);
+    if (words.length <= 4) {
+      return res.json({ shortened: text.trim().toUpperCase() });
+    }
+
+    // Получаем провайдер Gemini
+    const geminiProvider = getGeminiProvider();
+
+    // Формируем промпт для сокращения текста
+    const prompt = `Сократи следующий текст до 1-4 слов, сохраняя основной смысл. Ответ должен быть только сокращенным текстом, без дополнительных объяснений. Используй заглавные буквы.
+
+Текст: "${text}"
+
+Сокращенный текст (1-4 слова):`;
+
+    // Генерируем сокращенный текст
+    const result = await geminiProvider.generateContent(prompt);
+    const shortened = result.text.trim().toUpperCase();
+
+    res.json({ 
+      shortened,
+      original: text,
+      model: result.model
+    });
+  } catch (error) {
+    console.error('Ошибка при сокращении текста:', error);
+    // В случае ошибки возвращаем первые 4 слова текста
+    const words = req.body.text.trim().split(/\s+/).slice(0, 4);
+    res.json({ 
+      shortened: words.join(' ').toUpperCase(),
+      original: req.body.text,
+      fallback: true
+    });
+  }
+});
+
 // Детальный разбор результатов с помощью Gemini
 app.post('/api/analyze-results', async (req, res) => {
   try {
@@ -223,7 +269,7 @@ app.post('/api/analyses', async (req, res) => {
       return res.status(503).json({ error: 'База данных не доступна' });
     }
 
-    const { id, timestamp, goal, criteria, alternatives, levels, isMultiLevel, criteriaMatrix, alternativeMatrices, multiLevelMatrices, results } = req.body;
+    const { id, timestamp, goal, criteria, alternatives, levels, isMultiLevel, criteriaMatrix, alternativeMatrices, multiLevelMatrices, results, shortenedTexts } = req.body;
     
     // Детальная валидация данных
     console.log('📥 Получен запрос на сохранение анализа:', {
@@ -262,7 +308,8 @@ app.post('/api/analyses', async (req, res) => {
       criteriaMatrix,
       alternativeMatrices,
       multiLevelMatrices,
-      results
+      results,
+      shortenedTexts
     });
 
     console.log('✅ Анализ успешно сохранен через API:', { id: saved.id, timestamp: saved.timestamp });

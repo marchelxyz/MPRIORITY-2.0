@@ -3,6 +3,16 @@
  * Сохранение и загрузка анализов AHP
  */
 
+export interface ShortenedTexts {
+  goal?: { original: string; shortened: string }
+  criteria?: { original: string; shortened: string }[]
+  alternatives?: { original: string; shortened: string }[]
+  levels?: Array<{
+    name: { original: string; shortened: string }
+    items: { original: string; shortened: string }[]
+  }>
+}
+
 export interface SavedAnalysis {
   id: string
   timestamp: number
@@ -25,6 +35,7 @@ export interface SavedAnalysis {
   criteriaMatrix: number[][]
   alternativeMatrices: number[][][]
   multiLevelMatrices?: Record<string, number[][] | number[][][]>
+  shortenedTexts?: ShortenedTexts
 }
 
 /**
@@ -62,7 +73,8 @@ export async function getSavedAnalyses(): Promise<SavedAnalysis[]> {
         criteriaMatrix: a.criteriaMatrix,
         alternativeMatrices: a.alternativeMatrices,
         multiLevelMatrices: a.multiLevelMatrices,
-        results: a.results
+        results: a.results,
+        shortenedTexts: a.shortenedTexts
       }))
     }
     
@@ -96,7 +108,8 @@ export async function saveAnalysis(analysis: Partial<SavedAnalysis> & { goal: st
         criteriaMatrix: analysis.criteriaMatrix,
         alternativeMatrices: analysis.alternativeMatrices,
         multiLevelMatrices: analysis.multiLevelMatrices,
-        results: analysis.results
+        results: analysis.results,
+        shortenedTexts: analysis.shortenedTexts
       }),
     })
     
@@ -174,7 +187,8 @@ export async function getAnalysisById(id: string): Promise<SavedAnalysis | null>
       criteriaMatrix: data.criteriaMatrix,
       alternativeMatrices: data.alternativeMatrices,
       multiLevelMatrices: data.multiLevelMatrices,
-      results: data.results
+      results: data.results,
+      shortenedTexts: data.shortenedTexts
     }
   } catch (error) {
     console.error('Ошибка при получении анализа из базы данных:', error)
