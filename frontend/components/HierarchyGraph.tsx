@@ -10,15 +10,27 @@ interface HierarchyGraphProps {
   alternatives: string[]
   levels?: Array<{ name: string; items: string[] }>
   isMultiLevel?: boolean
+  hideControls?: boolean // Для скрытия элементов управления при экспорте в PDF
 }
 
 // Кастомный компонент узла для прямоугольников
 function RectangleNode({ data }: { data: { label: string } }) {
+  // Вычисляем размер узла в зависимости от длины текста
+  const textLength = data.label.length
+  const minWidth = 140
+  const minHeight = 60
+  const maxWidth = 300 // Максимальная ширина для длинного текста
+  const maxHeight = 120 // Максимальная высота для длинного текста
+  
+  // Увеличиваем размер узла если текст длинный
+  const width = textLength > 20 ? Math.min(maxWidth, minWidth + (textLength - 20) * 8) : minWidth
+  const height = textLength > 30 ? Math.min(maxHeight, minHeight + Math.floor((textLength - 30) / 15) * 20) : minHeight
+  
   return (
       <div
         style={{
-          width: '140px',
-          height: '60px',
+          width: `${width}px`,
+          minHeight: `${height}px`,
           backgroundColor: 'white',
           border: '1px solid #000',
           borderRadius: '4px',
@@ -28,14 +40,22 @@ function RectangleNode({ data }: { data: { label: string } }) {
           fontSize: '12px',
           fontWeight: '500',
           textAlign: 'center',
-          padding: '4px',
+          padding: '8px',
           wordWrap: 'break-word',
-          overflow: 'hidden',
+          overflow: 'visible',
           color: '#111827', // gray-900
+          whiteSpace: 'normal', // Разрешаем перенос текста
+          lineHeight: '1.3',
         }}
       >
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
-      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+      <div style={{ 
+        overflow: 'visible', 
+        maxWidth: '100%',
+        wordBreak: 'break-word',
+        whiteSpace: 'normal',
+        lineHeight: '1.3',
+      }}>
         {data.label}
       </div>
       <Handle type="source" position={Position.Bottom} style={{ visibility: 'hidden' }} />
@@ -47,7 +67,7 @@ const nodeTypes = {
   rectangle: RectangleNode,
 }
 
-export default function HierarchyGraph({ goal, criteria, alternatives, levels, isMultiLevel }: HierarchyGraphProps) {
+export default function HierarchyGraph({ goal, criteria, alternatives, levels, isMultiLevel, hideControls = false }: HierarchyGraphProps) {
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = []
     const edges: Edge[] = []
@@ -188,12 +208,14 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
         zoomOnPinch={true}
       >
         <Background color="#ffffff" gap={16} />
-        <Controls />
-        <MiniMap 
-          nodeColor="#e0e0e0"
-          maskColor="rgba(0, 0, 0, 0.1)"
-          style={{ backgroundColor: '#f9f9f9' }}
-        />
+        {!hideControls && <Controls />}
+        {!hideControls && (
+          <MiniMap 
+            nodeColor="#e0e0e0"
+            maskColor="rgba(0, 0, 0, 0.1)"
+            style={{ backgroundColor: '#f9f9f9' }}
+          />
+        )}
       </ReactFlow>
     </div>
   )
