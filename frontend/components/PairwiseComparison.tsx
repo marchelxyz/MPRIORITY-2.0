@@ -16,15 +16,23 @@ interface PairwiseComparisonProps {
 }
 
 const COMPARISON_SCALE = [
-  { value: 1, label: 'Равная важность' },
-  { value: 2, label: 'Немного важнее' },
-  { value: 3, label: 'Умеренно важнее' },
-  { value: 4, label: 'Значительно важнее' },
-  { value: 5, label: 'Существенно важнее' },
-  { value: 6, label: 'Очень важнее' },
-  { value: 7, label: 'Крайне важнее' },
-  { value: 8, label: 'Очень сильно важнее' },
-  { value: 9, label: 'Абсолютно важнее' },
+  { value: 1/9, label: '1/9 - Абсолютно менее важно' },
+  { value: 1/8, label: '1/8 - Очень сильно менее важно' },
+  { value: 1/7, label: '1/7 - Крайне менее важно' },
+  { value: 1/6, label: '1/6 - Очень менее важно' },
+  { value: 1/5, label: '1/5 - Существенно менее важно' },
+  { value: 1/4, label: '1/4 - Значительно менее важно' },
+  { value: 1/3, label: '1/3 - Умеренно менее важно' },
+  { value: 1/2, label: '1/2 - Немного менее важно' },
+  { value: 1, label: '1 - Равная важность' },
+  { value: 2, label: '2 - Немного важнее' },
+  { value: 3, label: '3 - Умеренно важнее' },
+  { value: 4, label: '4 - Значительно важнее' },
+  { value: 5, label: '5 - Существенно важнее' },
+  { value: 6, label: '6 - Очень важнее' },
+  { value: 7, label: '7 - Крайне важнее' },
+  { value: 8, label: '8 - Очень сильно важнее' },
+  { value: 9, label: '9 - Абсолютно важнее' },
 ]
 
 export default function PairwiseComparison({
@@ -42,13 +50,6 @@ export default function PairwiseComparison({
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
   const [showFractions, setShowFractions] = useState(false)
-  const [customFractionInputs, setCustomFractionInputs] = useState<Record<string, string>>({})
-  const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({})
-
-  // Проверяет, является ли значение стандартным (от 1 до 9)
-  const isStandardValue = (value: number): boolean => {
-    return COMPARISON_SCALE.some(scale => Math.abs(scale.value - value) < 0.001)
-  }
 
   // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
@@ -125,43 +126,11 @@ export default function PairwiseComparison({
         if (currentMatrixStr !== targetMatrixStr) {
           console.log(`📖 Переключение на матрицу критерия ${currentCriteriaIndex}:`, targetMatrix)
           setCurrentMatrix([...targetMatrix.map(row => [...row])]) // Глубокая копия
-          // Сбрасываем состояние пользовательского ввода при переключении матрицы
-          setShowCustomInput({})
-          setCustomFractionInputs({})
         }
       }
     }
   }, [currentCriteriaIndex]) // Только при изменении индекса
 
-  // Синхронизация состояния пользовательского ввода с матрицей
-  useEffect(() => {
-    if (!currentMatrix || currentMatrix.length === 0) return
-    
-    const newCustomInputs: Record<string, string> = {}
-    const newShowInputs: Record<string, boolean> = {}
-    
-    for (let i = 0; i < currentMatrix.length; i++) {
-      for (let j = 0; j < currentMatrix[i].length; j++) {
-        if (i < j) {
-          const value = currentMatrix[i][j]
-          if (!isStandardValue(value)) {
-            const cellKey = `${i}-${j}`
-            newShowInputs[cellKey] = true
-            newCustomInputs[cellKey] = decimalToFraction(value)
-          }
-        }
-      }
-    }
-    
-    // Обновляем только если есть изменения
-    const currentInputsStr = JSON.stringify(customFractionInputs)
-    const newInputsStr = JSON.stringify(newCustomInputs)
-    if (currentInputsStr !== newInputsStr) {
-      setCustomFractionInputs(newCustomInputs)
-      setShowCustomInput(newShowInputs)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMatrix])
 
   const updateMatrix = (i: number, j: number, value: number) => {
     // Проверяем, что матрица инициализирована
@@ -410,21 +379,30 @@ export default function PairwiseComparison({
     ? `${title} по критерию: "${criteria[currentCriteriaIndex]}"`
     : title
 
-  // Получает значение для select, учитывая пользовательский ввод
-  const getSelectValue = (i: number, j: number): string | number => {
-    const cellKey = `${i}-${j}`
-    const currentValue = currentMatrix[i]?.[j] ?? 1
+  // Находит ближайшее значение из шкалы для отображения в select
+  const findClosestScaleValue = (value: number): number => {
+    const precision = 0.0001 // Точность для сравнения чисел с плавающей точкой
     
-    if (showCustomInput[cellKey]) {
-      return 'custom'
+    // Сначала проверяем точное совпадение
+    for (const scale of COMPARISON_SCALE) {
+      if (Math.abs(value - scale.value) < precision) {
+        return scale.value
+      }
     }
     
-    // Если значение не стандартное, показываем пользовательский ввод
-    if (!isStandardValue(currentValue)) {
-      return 'custom'
+    // Если точного совпадения нет, находим ближайшее
+    let closest = COMPARISON_SCALE[0].value
+    let minDiff = Math.abs(value - closest)
+    
+    for (const scale of COMPARISON_SCALE) {
+      const diff = Math.abs(value - scale.value)
+      if (diff < minDiff) {
+        minDiff = diff
+        closest = scale.value
+      }
     }
     
-    return currentValue
+    return closest
   }
 
   // Проверяем, является ли матрица единичной (все значения = 1)
@@ -605,47 +583,17 @@ export default function PairwiseComparison({
                     {i === j ? (
                       <div className="text-center text-gray-600">1</div>
                     ) : i < j ? (
-                      <div className="space-y-1">
-                        <select
-                          value={getSelectValue(i, j)}
-                          onChange={(e) => {
-                            const cellKey = `${i}-${j}`
-                            if (e.target.value === 'custom') {
-                              setShowCustomInput({ ...showCustomInput, [cellKey]: true })
-                              const currentValue = currentMatrix[i]?.[j] ?? 1
-                              setCustomFractionInputs({ ...customFractionInputs, [cellKey]: isStandardValue(currentValue) ? '' : decimalToFraction(currentValue) })
-                            } else {
-                              setShowCustomInput({ ...showCustomInput, [cellKey]: false })
-                              updateMatrix(i, j, parseFloat(e.target.value))
-                            }
-                          }}
-                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                        >
-                          {COMPARISON_SCALE.map((scale) => (
-                            <option key={scale.value} value={scale.value}>
-                              {scale.value} - {scale.label}
-                            </option>
-                          ))}
-                          <option value="custom">Другое (введите дробь, например: 1/4)</option>
-                        </select>
-                        {(showCustomInput[`${i}-${j}`] || !isStandardValue(currentMatrix[i]?.[j] ?? 1)) && (
-                          <input
-                            type="text"
-                            value={customFractionInputs[`${i}-${j}`] ?? (isStandardValue(currentMatrix[i]?.[j] ?? 1) ? '' : decimalToFraction(currentMatrix[i]?.[j] ?? 1))}
-                            onChange={(e) => {
-                              const cellKey = `${i}-${j}`
-                              setCustomFractionInputs({ ...customFractionInputs, [cellKey]: e.target.value })
-                              setShowCustomInput({ ...showCustomInput, [cellKey]: true })
-                              const decimalValue = fractionToDecimal(e.target.value)
-                              if (decimalValue !== null && decimalValue > 0) {
-                                updateMatrix(i, j, decimalValue)
-                              }
-                            }}
-                            placeholder="1/4 или 0.25"
-                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white text-sm"
-                          />
-                        )}
-                      </div>
+                      <select
+                        value={findClosestScaleValue(currentMatrix[i]?.[j] ?? 1)}
+                        onChange={(e) => updateMatrix(i, j, parseFloat(e.target.value))}
+                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                      >
+                        {COMPARISON_SCALE.map((scale) => (
+                          <option key={scale.value} value={scale.value}>
+                            {scale.label}
+                          </option>
+                        ))}
+                      </select>
                     ) : (
                       <div className="text-center text-gray-700">
                         {currentMatrix[i]?.[j] 
