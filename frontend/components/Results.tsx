@@ -168,19 +168,27 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         tempDiv.style.color = '#000000'
         tempDiv.style.whiteSpace = 'pre-wrap'
         tempDiv.style.width = `${(options?.maxWidth || pageWidth - 2 * margin) * 3.779527559}px`
-        tempDiv.style.padding = '0'
+        tempDiv.style.padding = '8px' // Добавляем padding чтобы буквы не обрезались
         tempDiv.style.margin = '0'
-        tempDiv.style.lineHeight = '1.4'
+        tempDiv.style.lineHeight = '1.5' // Увеличиваем line-height для лучшей читаемости
+        tempDiv.style.overflow = 'visible' // Убеждаемся что текст не обрезается
+        tempDiv.style.boxSizing = 'border-box'
         tempDiv.textContent = text
         document.body.appendChild(tempDiv)
         
+        // Ждем немного чтобы элемент отрендерился
+        await new Promise(resolve => setTimeout(resolve, 10))
+        
         const canvas = await html2canvas(tempDiv, {
           backgroundColor: '#ffffff',
-          scale: 1.5, // уменьшаем scale для лучшего качества
+          scale: 2, // Увеличиваем scale для лучшего качества и чтобы буквы не обрезались
           logging: false,
           useCORS: true,
           width: tempDiv.offsetWidth,
-          height: tempDiv.offsetHeight
+          height: tempDiv.offsetHeight,
+          windowWidth: tempDiv.offsetWidth,
+          windowHeight: tempDiv.offsetHeight,
+          allowTaint: true
         })
         
         document.body.removeChild(tempDiv)
@@ -219,6 +227,8 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         tableDiv.style.width = `${tableMaxWidth}px`
         tableDiv.style.fontFamily = 'Arial, sans-serif'
         tableDiv.style.fontSize = `${(options?.fontSize || 9) * 2.834645669}px`
+        tableDiv.style.overflow = 'visible' // Убеждаемся что таблица не обрезается
+        tableDiv.style.boxSizing = 'border-box'
         
         const table = document.createElement('table')
         table.style.borderCollapse = 'collapse'
@@ -233,11 +243,15 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
           const th = document.createElement('th')
           th.textContent = header
           th.style.border = '1px solid #000000'
-          th.style.padding = '4px 8px'
+          th.style.padding = '8px 12px' // Увеличиваем padding чтобы буквы не обрезались
           th.style.textAlign = 'left'
           th.style.fontWeight = 'bold'
           th.style.color = options?.headTextColor || '#ffffff'
           th.style.backgroundColor = options?.headFillColor || '#0ea5e9'
+          th.style.lineHeight = '1.5' // Добавляем line-height
+          th.style.verticalAlign = 'middle' // Выравнивание по вертикали
+          th.style.whiteSpace = 'normal' // Разрешаем перенос текста
+          th.style.overflow = 'visible'
           if (options?.columnStyles?.[colIndex]?.cellWidth) {
             th.style.width = `${(options.columnStyles[colIndex].cellWidth! / (pageWidth - 2 * margin)) * 100}%`
           }
@@ -254,8 +268,12 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             const td = document.createElement('td')
             td.textContent = cell
             td.style.border = '1px solid #000000'
-            td.style.padding = '4px 8px'
+            td.style.padding = '8px 12px' // Увеличиваем padding чтобы буквы не обрезались
             td.style.textAlign = 'left'
+            td.style.lineHeight = '1.5' // Добавляем line-height
+            td.style.verticalAlign = 'middle' // Выравнивание по вертикали
+            td.style.whiteSpace = 'normal' // Разрешаем перенос текста
+            td.style.overflow = 'visible'
             if (options?.columnStyles?.[colIndex]) {
               const colStyle = options.columnStyles[colIndex]
               if (colStyle.fontStyle === 'bold') {
@@ -282,13 +300,19 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         tableDiv.appendChild(table)
         document.body.appendChild(tableDiv)
         
+        // Ждем немного чтобы элемент отрендерился
+        await new Promise(resolve => setTimeout(resolve, 10))
+        
         const canvas = await html2canvas(tableDiv, {
           backgroundColor: '#ffffff',
-          scale: 1.5,
+          scale: 2, // Увеличиваем scale для лучшего качества и чтобы буквы не обрезались
           logging: false,
           useCORS: true,
           width: tableDiv.offsetWidth,
-          height: tableDiv.offsetHeight
+          height: tableDiv.offsetHeight,
+          windowWidth: tableDiv.offsetWidth,
+          windowHeight: tableDiv.offsetHeight,
+          allowTaint: true
         })
         
         document.body.removeChild(tableDiv)
@@ -674,14 +698,26 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         footerDiv.style.textAlign = 'center'
         footerDiv.style.width = `${(pageWidth - 2 * margin) * 3.779527559}px`
         footerDiv.style.fontStyle = 'italic'
+        footerDiv.style.padding = '4px' // Добавляем padding чтобы буквы не обрезались
+        footerDiv.style.lineHeight = '1.5' // Добавляем line-height
+        footerDiv.style.overflow = 'visible' // Убеждаемся что текст не обрезается
+        footerDiv.style.boxSizing = 'border-box'
         footerDiv.textContent = pageFooterText
         document.body.appendChild(footerDiv)
         
+        // Ждем немного чтобы элемент отрендерился
+        await new Promise(resolve => setTimeout(resolve, 10))
+        
         const footerCanvas = await html2canvas(footerDiv, {
           backgroundColor: '#ffffff',
-          scale: 1.5,
+          scale: 2, // Увеличиваем scale для лучшего качества
           logging: false,
-          useCORS: true
+          useCORS: true,
+          width: footerDiv.offsetWidth,
+          height: footerDiv.offsetHeight,
+          windowWidth: footerDiv.offsetWidth,
+          windowHeight: footerDiv.offsetHeight,
+          allowTaint: true
         })
         document.body.removeChild(footerDiv)
         
