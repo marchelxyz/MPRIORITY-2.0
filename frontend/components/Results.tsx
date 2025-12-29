@@ -243,12 +243,14 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
           const th = document.createElement('th')
           th.textContent = header
           th.style.border = '1px solid #000000'
-          th.style.padding = '8px 12px' // Увеличиваем padding чтобы буквы не обрезались
+          // Уменьшаем padding для детальной таблицы (когда fontSize < 8)
+          const padding = (options?.fontSize || 9) < 8 ? '4px 6px' : '8px 12px'
+          th.style.padding = padding
           th.style.textAlign = 'left'
           th.style.fontWeight = 'bold'
           th.style.color = options?.headTextColor || '#ffffff'
           th.style.backgroundColor = options?.headFillColor || '#0ea5e9'
-          th.style.lineHeight = '1.5' // Добавляем line-height
+          th.style.lineHeight = '1.3' // Уменьшаем line-height для компактности
           th.style.verticalAlign = 'middle' // Выравнивание по вертикали
           th.style.whiteSpace = 'normal' // Разрешаем перенос текста
           th.style.overflow = 'visible'
@@ -268,9 +270,11 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             const td = document.createElement('td')
             td.textContent = cell
             td.style.border = '1px solid #000000'
-            td.style.padding = '8px 12px' // Увеличиваем padding чтобы буквы не обрезались
+            // Уменьшаем padding для детальной таблицы (когда fontSize < 8)
+            const padding = (options?.fontSize || 9) < 8 ? '4px 6px' : '8px 12px'
+            td.style.padding = padding
             td.style.textAlign = 'left'
-            td.style.lineHeight = '1.5' // Добавляем line-height
+            td.style.lineHeight = '1.3' // Уменьшаем line-height для компактности
             td.style.verticalAlign = 'middle' // Выравнивание по вертикали
             td.style.whiteSpace = 'normal' // Разрешаем перенос текста
             td.style.overflow = 'visible'
@@ -387,6 +391,15 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         })
         yPos += 3
 
+        // Скрываем элементы управления перед экспортом
+        const graphElement = hierarchyGraphRef.current
+        const controlsElements = graphElement.querySelectorAll('.react-flow__controls, .react-flow__minimap')
+        const originalDisplay: string[] = []
+        controlsElements.forEach((el) => {
+          originalDisplay.push((el as HTMLElement).style.display)
+          ;(el as HTMLElement).style.display = 'none'
+        })
+
         const graphCanvas = await html2canvas(hierarchyGraphRef.current, {
           backgroundColor: '#ffffff',
           scale: 1.5,
@@ -394,6 +407,11 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
           useCORS: true,
           windowWidth: hierarchyGraphRef.current.scrollWidth,
           windowHeight: hierarchyGraphRef.current.scrollHeight
+        })
+
+        // Восстанавливаем элементы управления
+        controlsElements.forEach((el, index) => {
+          ;(el as HTMLElement).style.display = originalDisplay[index] || ''
         })
         
         const graphImgData = graphCanvas.toDataURL('image/png')
@@ -446,23 +464,21 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         }
       )
 
-      // График бар-чарта
+      // График бар-чарта - занимает целую страницу
       if (barChartRef.current) {
-        if (yPos > pageHeight - 80) {
-          doc.addPage('l')
-          yPos = margin
-        }
+        doc.addPage('l')
+        yPos = margin
         
         yPos = await addTextAsImage('Глобальные приоритеты альтернатив:', margin, yPos, {
-          fontSize: 11,
+          fontSize: 12,
           fontStyle: 'bold',
           maxWidth: pageWidth - 2 * margin
         })
-        yPos += 3
+        yPos += 5
 
         const barChartCanvas = await html2canvas(barChartRef.current, {
           backgroundColor: '#ffffff',
-          scale: 1.5,
+          scale: 2,
           logging: false,
           useCORS: true,
           windowWidth: barChartRef.current.scrollWidth,
@@ -470,18 +486,14 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         })
         
         const barChartImgData = barChartCanvas.toDataURL('image/png')
+        // Используем всю доступную высоту страницы
+        const availableHeight = pageHeight - yPos - 15
         const barChartImgWidth = pageWidth - 2 * margin
         const barChartImgHeight = (barChartCanvas.height / barChartCanvas.width) * barChartImgWidth
         
-        // Ограничиваем высоту графика
-        const maxChartHeight = pageHeight - yPos - 15
-        const finalChartHeight = Math.min(barChartImgHeight, maxChartHeight)
-        const finalChartWidth = (barChartCanvas.width / barChartCanvas.height) * finalChartHeight
-        
-        if (yPos + finalChartHeight > pageHeight - 15) {
-          doc.addPage('l')
-          yPos = margin
-        }
+        // Увеличиваем график до размера страницы
+        const finalChartHeight = Math.min(barChartImgHeight, availableHeight)
+        const finalChartWidth = pageWidth - 2 * margin
         
         doc.addImage(barChartImgData, 'PNG', margin, yPos, finalChartWidth, finalChartHeight)
         yPos += finalChartHeight + 5
@@ -518,23 +530,21 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         }
       )
 
-      // График пирога
+      // График пирога - занимает целую страницу
       if (pieChartRef.current) {
-        if (yPos > pageHeight - 80) {
-          doc.addPage('l')
-          yPos = margin
-        }
+        doc.addPage('l')
+        yPos = margin
         
         yPos = await addTextAsImage('Приоритеты критериев (график):', margin, yPos, {
-          fontSize: 11,
+          fontSize: 12,
           fontStyle: 'bold',
           maxWidth: pageWidth - 2 * margin
         })
-        yPos += 3
+        yPos += 5
 
         const pieChartCanvas = await html2canvas(pieChartRef.current, {
           backgroundColor: '#ffffff',
-          scale: 1.5,
+          scale: 2,
           logging: false,
           useCORS: true,
           windowWidth: pieChartRef.current.scrollWidth,
@@ -542,18 +552,14 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         })
         
         const pieChartImgData = pieChartCanvas.toDataURL('image/png')
+        // Используем всю доступную высоту страницы
+        const availableHeight = pageHeight - yPos - 15
         const pieChartImgWidth = pageWidth - 2 * margin
         const pieChartImgHeight = (pieChartCanvas.height / pieChartCanvas.width) * pieChartImgWidth
         
-        // Ограничиваем высоту графика
-        const maxPieHeight = pageHeight - yPos - 15
-        const finalPieHeight = Math.min(pieChartImgHeight, maxPieHeight)
-        const finalPieWidth = (pieChartCanvas.width / pieChartCanvas.height) * finalPieHeight
-        
-        if (yPos + finalPieHeight > pageHeight - 15) {
-          doc.addPage('l')
-          yPos = margin
-        }
+        // Увеличиваем график до размера страницы
+        const finalPieHeight = Math.min(pieChartImgHeight, availableHeight)
+        const finalPieWidth = pageWidth - 2 * margin
         
         doc.addImage(pieChartImgData, 'PNG', margin, yPos, finalPieWidth, finalPieHeight)
         yPos += finalPieHeight + 5
@@ -603,7 +609,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
           maxWidth: pageWidth - 2 * margin,
           headFillColor: '#3b82f6',
           headTextColor: '#ffffff',
-          fontSize: 8,
+          fontSize: 7, // Уменьшаем шрифт для размещения на листе
           columnStyles
         }
       )
@@ -1334,6 +1340,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             alternatives={hierarchy.alternatives}
             levels={hierarchy.levels}
             isMultiLevel={hierarchy.isMultiLevel}
+            hideControls={false}
           />
         </div>
       </div>
