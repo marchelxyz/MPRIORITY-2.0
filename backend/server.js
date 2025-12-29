@@ -57,54 +57,93 @@ app.post('/api/calculate-global-priorities', (req, res) => {
       hasHierarchy: !!hierarchy,
       hasCriteriaMatrix: !!criteriaMatrix,
       hasAlternativeMatrices: !!alternativeMatrices,
+      isMultiLevel: !!(hierarchy?.levels && Array.isArray(hierarchy.levels)),
+      levelsCount: hierarchy?.levels?.length || 0,
       criteriaCount: hierarchy?.criteria?.length || 0,
       alternativesCount: hierarchy?.alternatives?.length || 0,
-      criteriaMatrixSize: criteriaMatrix?.length || 0,
-      alternativeMatricesCount: alternativeMatrices?.length || 0
+      criteriaMatrixSize: Array.isArray(criteriaMatrix) ? criteriaMatrix.length : 'object',
+      alternativeMatricesCount: Array.isArray(alternativeMatrices) ? alternativeMatrices.length : 'N/A'
     });
     
-    if (!hierarchy || !criteriaMatrix || !alternativeMatrices) {
-      return res.status(400).json({ error: 'Недостаточно данных для расчета' });
+    if (!hierarchy) {
+      return res.status(400).json({ error: 'Недостаточно данных для расчета: отсутствует иерархия' });
     }
     
-    // Детальное логирование матриц
-    if (criteriaMatrix && criteriaMatrix.length > 0) {
-      console.log('📋 Матрица критериев:', {
-        size: `${criteriaMatrix.length}x${criteriaMatrix[0]?.length || 0}`,
-        matrix: criteriaMatrix,
-        sampleRow: criteriaMatrix[0],
-        hasNonOneValues: criteriaMatrix.some((row, i) => 
-          row.some((val, j) => i !== j && val !== 1)
-        )
+    // Проверяем, является ли это многоуровневой иерархией
+    const isMultiLevel = hierarchy.levels && Array.isArray(hierarchy.levels) && hierarchy.levels.length > 0;
+    
+    if (isMultiLevel) {
+      // Многоуровневая иерархия
+      if (!criteriaMatrix || typeof criteriaMatrix !== 'object') {
+        return res.status(400).json({ error: 'Для многоуровневой иерархии требуется объект с матрицами' });
+      }
+      
+      console.log('📋 Многоуровневая иерархия:', {
+        levelsCount: hierarchy.levels.length,
+        levels: hierarchy.levels.map((l, i) => ({
+          level: i,
+          name: l.name,
+          itemsCount: l.items.length
+        })),
+        matricesKeys: Object.keys(criteriaMatrix)
       });
-    }
-    
-    if (alternativeMatrices && alternativeMatrices.length > 0) {
-      console.log('📋 Матрицы альтернатив:', {
-        count: alternativeMatrices.length,
-        matrices: alternativeMatrices.map((matrix, idx) => ({
-          criterion: hierarchy.criteria?.[idx],
-          size: `${matrix.length}x${matrix[0]?.length || 0}`,
-          sampleRow: matrix[0],
-          hasNonOneValues: matrix.some((row, i) => 
-            row.some((val, j) => i !== j && val !== 1)
-          )
+      
+      const result = calculateGlobalPriorities(hierarchy, criteriaMatrix, null);
+      
+      console.log('✅ Результаты расчета многоуровневой иерархии:', {
+        globalPriorities: result.globalPriorities?.map(alt => ({
+          name: alt.name,
+          priority: alt.priority,
+          rank: alt.rank
         }))
       });
+      
+      res.json(result);
+    } else {
+      // Классическая 3-уровневая иерархия
+      if (!criteriaMatrix || !alternativeMatrices) {
+        return res.status(400).json({ error: 'Недостаточно данных для расчета' });
+      }
+      
+      // Детальное логирование матриц
+      if (criteriaMatrix && criteriaMatrix.length > 0) {
+        console.log('📋 Матрица критериев:', {
+          size: `${criteriaMatrix.length}x${criteriaMatrix[0]?.length || 0}`,
+          matrix: criteriaMatrix,
+          sampleRow: criteriaMatrix[0],
+          hasNonOneValues: criteriaMatrix.some((row, i) => 
+            row.some((val, j) => i !== j && val !== 1)
+          )
+        });
+      }
+      
+      if (alternativeMatrices && alternativeMatrices.length > 0) {
+        console.log('📋 Матрицы альтернатив:', {
+          count: alternativeMatrices.length,
+          matrices: alternativeMatrices.map((matrix, idx) => ({
+            criterion: hierarchy.criteria?.[idx],
+            size: `${matrix.length}x${matrix[0]?.length || 0}`,
+            sampleRow: matrix[0],
+            hasNonOneValues: matrix.some((row, i) => 
+              row.some((val, j) => i !== j && val !== 1)
+            )
+          }))
+        });
+      }
+      
+      const result = calculateGlobalPriorities(hierarchy, criteriaMatrix, alternativeMatrices);
+      
+      console.log('✅ Результаты расчета:', {
+        criteriaPriorities: result.criteriaPriorities,
+        globalPriorities: result.globalPriorities.map(alt => ({
+          name: alt.name,
+          priority: alt.priority,
+          rank: alt.rank
+        }))
+      });
+      
+      res.json(result);
     }
-    
-    const result = calculateGlobalPriorities(hierarchy, criteriaMatrix, alternativeMatrices);
-    
-    console.log('✅ Результаты расчета:', {
-      criteriaPriorities: result.criteriaPriorities,
-      globalPriorities: result.globalPriorities.map(alt => ({
-        name: alt.name,
-        priority: alt.priority,
-        rank: alt.rank
-      }))
-    });
-    
-    res.json(result);
   } catch (error) {
     console.error('❌ Ошибка при расчете глобальных приоритетов:', error);
     res.status(500).json({ error: error.message });
@@ -184,7 +223,7 @@ app.post('/api/analyses', async (req, res) => {
       return res.status(503).json({ error: 'База данных не доступна' });
     }
 
-    const { id, timestamp, goal, criteria, alternatives, criteriaMatrix, alternativeMatrices, results } = req.body;
+    const { id, timestamp, goal, criteria, alternatives, levels, isMultiLevel, criteriaMatrix, alternativeMatrices, multiLevelMatrices, results } = req.body;
     
     // Детальная валидация данных
     console.log('📥 Получен запрос на сохранение анализа:', {
@@ -218,8 +257,11 @@ app.post('/api/analyses', async (req, res) => {
       goal,
       criteria,
       alternatives,
+      levels,
+      isMultiLevel,
       criteriaMatrix,
       alternativeMatrices,
+      multiLevelMatrices,
       results
     });
 
