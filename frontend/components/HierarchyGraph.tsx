@@ -14,17 +14,10 @@ interface HierarchyGraphProps {
 }
 
 // Кастомный компонент узла для прямоугольников
-function RectangleNode({ data }: { data: { label: string } }) {
-  // Вычисляем размер узла в зависимости от длины текста
-  const textLength = data.label.length
-  const minWidth = 140
-  const minHeight = 60
-  const maxWidth = 300 // Максимальная ширина для длинного текста
-  const maxHeight = 120 // Максимальная высота для длинного текста
-  
-  // Увеличиваем размер узла если текст длинный
-  const width = textLength > 20 ? Math.min(maxWidth, minWidth + (textLength - 20) * 8) : minWidth
-  const height = textLength > 30 ? Math.min(maxHeight, minHeight + Math.floor((textLength - 30) / 15) * 20) : minHeight
+function RectangleNode({ data }: { data: { label: string; width?: number; height?: number } }) {
+  // Используем единый размер из data, если он передан, иначе вычисляем по тексту
+  const width = data.width || 140
+  const height = data.height || 60
   
   return (
       <div
@@ -72,11 +65,43 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
     const nodes: Node[] = []
     const edges: Edge[] = []
 
-    // Параметры для позиционирования
-    const levelSpacing = 200 // Расстояние между уровнями по вертикали
-    const nodeSpacing = 150 // Расстояние между узлами на одном уровне
-    const nodeWidth = 140
-    const nodeHeight = 60
+    // Собираем все тексты для вычисления максимального размера
+    const allTexts: string[] = []
+    if (isMultiLevel && levels && levels.length > 0) {
+      allTexts.push(goal)
+      levels.forEach(level => {
+        level.items.forEach(item => allTexts.push(item))
+      })
+    } else {
+      allTexts.push(goal)
+      criteria.forEach(c => allTexts.push(c))
+      alternatives.forEach(a => allTexts.push(a))
+    }
+
+    // Вычисляем максимальную длину текста
+    const maxTextLength = Math.max(...allTexts.map(text => text.length))
+    
+    // Вычисляем единый размер для всех узлов на основе максимального текста
+    const minWidth = 140
+    const minHeight = 60
+    const maxWidth = 300
+    const maxHeight = 120
+    
+    const unifiedWidth = maxTextLength > 20 
+      ? Math.min(maxWidth, minWidth + (maxTextLength - 20) * 8) 
+      : minWidth
+    const unifiedHeight = maxTextLength > 30 
+      ? Math.min(maxHeight, minHeight + Math.floor((maxTextLength - 30) / 15) * 20) 
+      : minHeight
+
+    // Увеличиваем расстояние между узлами, если они большие
+    const baseNodeSpacing = 150
+    const baseLevelSpacing = 200
+    const nodeSpacing = unifiedWidth > 200 ? baseNodeSpacing + (unifiedWidth - 200) * 0.5 : baseNodeSpacing
+    const levelSpacing = unifiedHeight > 80 ? baseLevelSpacing + (unifiedHeight - 80) * 1.5 : baseLevelSpacing
+
+    // Сохраняем единый размер в data для использования в компоненте узла
+    const nodeSize = { width: unifiedWidth, height: unifiedHeight }
 
     if (isMultiLevel && levels && levels.length > 0) {
       // Многоуровневая иерархия
@@ -94,14 +119,14 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
         const itemsStartX = (maxItems * nodeSpacing) / 2 - ((items.length - 1) * nodeSpacing) / 2
 
         items.forEach((item, itemIndex) => {
-          const x = itemsStartX + itemIndex * nodeSpacing - nodeWidth / 2
+          const x = itemsStartX + itemIndex * nodeSpacing - unifiedWidth / 2
           const nodeId = `level-${levelIndex}-item-${itemIndex}`
           
           nodes.push({
             id: nodeId,
             type: 'rectangle',
             position: { x, y: levelY },
-            data: { label: item },
+            data: { label: item, ...nodeSize },
           })
 
           // Связи с предыдущим уровнем
@@ -130,8 +155,8 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
       nodes.push({
         id: 'goal',
         type: 'rectangle',
-        position: { x: goalX - nodeWidth / 2, y: goalY },
-        data: { label: goal },
+        position: { x: goalX - unifiedWidth / 2, y: goalY },
+        data: { label: goal, ...nodeSize },
       })
 
       // Средний уровень - критерии
@@ -140,12 +165,12 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
                             ((criteria.length - 1) * nodeSpacing) / 2
 
       criteria.forEach((criterion, index) => {
-        const x = criteriaStartX + index * nodeSpacing - nodeWidth / 2
+        const x = criteriaStartX + index * nodeSpacing - unifiedWidth / 2
         nodes.push({
           id: `criteria-${index}`,
           type: 'rectangle',
           position: { x, y: criteriaY },
-          data: { label: criterion },
+          data: { label: criterion, ...nodeSize },
         })
 
         // Связь от цели к критерию
@@ -166,12 +191,12 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
                                ((alternatives.length - 1) * nodeSpacing) / 2
 
       alternatives.forEach((alternative, index) => {
-        const x = alternativesStartX + index * nodeSpacing - nodeWidth / 2
+        const x = alternativesStartX + index * nodeSpacing - unifiedWidth / 2
         nodes.push({
           id: `alternative-${index}`,
           type: 'rectangle',
           position: { x, y: alternativesY },
-          data: { label: alternative },
+          data: { label: alternative, ...nodeSize },
         })
 
         // Связи от каждого критерия к каждой альтернативе

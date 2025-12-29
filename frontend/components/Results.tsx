@@ -253,6 +253,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
           th.style.lineHeight = '1.3' // Уменьшаем line-height для компактности
           th.style.verticalAlign = 'middle' // Выравнивание по вертикали
           th.style.whiteSpace = 'normal' // Разрешаем перенос текста
+          th.style.wordBreak = 'break-word' // Переносим длинные слова
           th.style.overflow = 'visible'
           if (options?.columnStyles?.[colIndex]?.cellWidth) {
             th.style.width = `${(options.columnStyles[colIndex].cellWidth! / (pageWidth - 2 * margin)) * 100}%`
@@ -277,6 +278,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             td.style.lineHeight = '1.3' // Уменьшаем line-height для компактности
             td.style.verticalAlign = 'middle' // Выравнивание по вертикали
             td.style.whiteSpace = 'normal' // Разрешаем перенос текста
+            td.style.wordBreak = 'break-word' // Переносим длинные слова
             td.style.overflow = 'visible'
             if (options?.columnStyles?.[colIndex]) {
               const colStyle = options.columnStyles[colIndex]
@@ -464,11 +466,12 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         }
       )
 
-      // График бар-чарта - занимает целую страницу
+      // График бар-чарта и таблица приоритетов критериев на одной странице
       if (barChartRef.current) {
         doc.addPage('l')
         yPos = margin
         
+        // Заголовок для графика
         yPos = await addTextAsImage('Глобальные приоритеты альтернатив:', margin, yPos, {
           fontSize: 12,
           fontStyle: 'bold',
@@ -486,49 +489,89 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         })
         
         const barChartImgData = barChartCanvas.toDataURL('image/png')
-        // Используем всю доступную высоту страницы
-        const availableHeight = pageHeight - yPos - 15
+        // Выделяем место для графика и таблицы на одной странице
+        // График занимает примерно 60% доступной высоты
+        const availableHeightForCharts = pageHeight - yPos - 80 // Оставляем место для таблицы
         const barChartImgWidth = pageWidth - 2 * margin
         const barChartImgHeight = (barChartCanvas.height / barChartCanvas.width) * barChartImgWidth
         
-        // Увеличиваем график до размера страницы
-        const finalChartHeight = Math.min(barChartImgHeight, availableHeight)
+        // Ограничиваем высоту графика, чтобы поместилась таблица
+        const finalChartHeight = Math.min(barChartImgHeight, availableHeightForCharts)
         const finalChartWidth = pageWidth - 2 * margin
         
         doc.addImage(barChartImgData, 'PNG', margin, yPos, finalChartWidth, finalChartHeight)
-        yPos += finalChartHeight + 5
-      }
+        yPos += finalChartHeight + 10
 
-      // Приоритеты критериев
-      if (yPos > pageHeight - 30) {
-        doc.addPage('l')
-        yPos = margin
-      }
-
-      yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
-        fontSize: 11,
-        fontStyle: 'bold',
-        maxWidth: pageWidth - 2 * margin
-      })
-      yPos += 3
-
-      const criteriaData = hierarchy.criteria.map((crit, idx) => [
-        crit,
-        `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
-      ])
-
-      yPos = await addTableAsImage(
-        ['Критерий', 'Приоритет'],
-        criteriaData,
-        margin,
-        yPos,
-        {
-          maxWidth: pageWidth - 2 * margin,
-          headFillColor: '#8b5cf6',
-          headTextColor: '#ffffff',
-          fontSize: 9
+        // Проверяем, поместится ли таблица на этой странице
+        if (yPos > pageHeight - 50) {
+          doc.addPage('l')
+          yPos = margin
         }
-      )
+
+        // Приоритеты критериев - на той же странице
+        yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
+          fontSize: 11,
+          fontStyle: 'bold',
+          maxWidth: pageWidth - 2 * margin
+        })
+        yPos += 3
+
+        const criteriaData = hierarchy.criteria.map((crit, idx) => [
+          crit,
+          `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
+        ])
+
+        yPos = await addTableAsImage(
+          ['Критерий', 'Приоритет'],
+          criteriaData,
+          margin,
+          yPos,
+          {
+            maxWidth: pageWidth - 2 * margin,
+            headFillColor: '#8b5cf6',
+            headTextColor: '#ffffff',
+            fontSize: 9
+          }
+        )
+      } else {
+        // Если графика нет, просто добавляем таблицу приоритетов критериев
+        if (yPos > pageHeight - 30) {
+          doc.addPage('l')
+          yPos = margin
+        }
+
+        yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
+          fontSize: 11,
+          fontStyle: 'bold',
+          maxWidth: pageWidth - 2 * margin
+        })
+        yPos += 3
+
+        const criteriaData = hierarchy.criteria.map((crit, idx) => [
+          crit,
+          `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
+        ])
+
+        // Определяем ширину колонок для таблицы приоритетов критериев
+        const criteriaColumnStyles: Record<number, { cellWidth?: number; fontStyle?: string; fillColor?: string }> = {
+          0: { cellWidth: (pageWidth - 2 * margin) * 0.7 }, // 70% для названия критерия
+          1: { cellWidth: (pageWidth - 2 * margin) * 0.3 }  // 30% для приоритета
+        }
+
+        yPos = await addTableAsImage(
+          ['Критерий', 'Приоритет'],
+          criteriaData,
+          margin,
+          yPos,
+          {
+            maxWidth: pageWidth - 2 * margin,
+            headFillColor: '#8b5cf6',
+            headTextColor: '#ffffff',
+            fontSize: 9,
+            columnStyles: criteriaColumnStyles
+          }
+        )
+      }
 
       // График пирога - занимает целую страницу
       if (pieChartRef.current) {
@@ -1539,20 +1582,24 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
           <div className="mt-4 text-sm">
             <table className="w-full border-collapse">
               <tbody>
-                {criteriaChartData.map((entry, index) => (
-                  <tr key={index} className="border-b border-gray-200">
-                    <td className="py-1 text-gray-900">
-                      <span 
-                        className="inline-block w-4 h-4 rounded mr-2" 
-                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                      />
-                      {entry.name}
-                    </td>
-                    <td className="py-1 text-right font-semibold text-gray-900">
-                      {Number(entry.priority).toFixed(2)}%
-                    </td>
-                  </tr>
-                ))}
+                {criteriaChartData.map((entry, index) => {
+                  const textLength = entry.name.length
+                  const fontSize = textLength > 30 ? 'text-xs' : textLength > 20 ? 'text-sm' : 'text-sm'
+                  return (
+                    <tr key={index} className="border-b border-gray-200">
+                      <td className="py-1 text-gray-900 break-words" style={{ maxWidth: '70%', wordBreak: 'break-word' }}>
+                        <span 
+                          className="inline-block w-4 h-4 rounded mr-2 flex-shrink-0" 
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <span className={fontSize}>{entry.name}</span>
+                      </td>
+                      <td className="py-1 text-right font-semibold text-gray-900 whitespace-nowrap">
+                        {Number(entry.priority).toFixed(2)}%
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
