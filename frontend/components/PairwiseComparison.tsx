@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 import HelpTooltip from './HelpTooltip'
-import { decimalToFraction } from '@/lib/fractions'
+import { decimalToFraction, fractionToDecimal } from '@/lib/fractions'
 
 interface PairwiseComparisonProps {
   title: string
@@ -42,6 +42,13 @@ export default function PairwiseComparison({
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
   const [showFractions, setShowFractions] = useState(false)
+  const [customFractionInputs, setCustomFractionInputs] = useState<Record<string, string>>({})
+  const [showCustomInput, setShowCustomInput] = useState<Record<string, boolean>>({})
+
+  // Проверяет, является ли значение стандартным (от 1 до 9)
+  const isStandardValue = (value: number): boolean => {
+    return COMPARISON_SCALE.some(scale => Math.abs(scale.value - value) < 0.001)
+  }
 
   // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
@@ -118,10 +125,43 @@ export default function PairwiseComparison({
         if (currentMatrixStr !== targetMatrixStr) {
           console.log(`📖 Переключение на матрицу критерия ${currentCriteriaIndex}:`, targetMatrix)
           setCurrentMatrix([...targetMatrix.map(row => [...row])]) // Глубокая копия
+          // Сбрасываем состояние пользовательского ввода при переключении матрицы
+          setShowCustomInput({})
+          setCustomFractionInputs({})
         }
       }
     }
   }, [currentCriteriaIndex]) // Только при изменении индекса
+
+  // Синхронизация состояния пользовательского ввода с матрицей
+  useEffect(() => {
+    if (!currentMatrix || currentMatrix.length === 0) return
+    
+    const newCustomInputs: Record<string, string> = {}
+    const newShowInputs: Record<string, boolean> = {}
+    
+    for (let i = 0; i < currentMatrix.length; i++) {
+      for (let j = 0; j < currentMatrix[i].length; j++) {
+        if (i < j) {
+          const value = currentMatrix[i][j]
+          if (!isStandardValue(value)) {
+            const cellKey = `${i}-${j}`
+            newShowInputs[cellKey] = true
+            newCustomInputs[cellKey] = decimalToFraction(value)
+          }
+        }
+      }
+    }
+    
+    // Обновляем только если есть изменения
+    const currentInputsStr = JSON.stringify(customFractionInputs)
+    const newInputsStr = JSON.stringify(newCustomInputs)
+    if (currentInputsStr !== newInputsStr) {
+      setCustomFractionInputs(newCustomInputs)
+      setShowCustomInput(newShowInputs)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentMatrix])
 
   const updateMatrix = (i: number, j: number, value: number) => {
     // Проверяем, что матрица инициализирована
@@ -370,6 +410,23 @@ export default function PairwiseComparison({
     ? `${title} по критерию: "${criteria[currentCriteriaIndex]}"`
     : title
 
+  // Получает значение для select, учитывая пользовательский ввод
+  const getSelectValue = (i: number, j: number): string | number => {
+    const cellKey = `${i}-${j}`
+    const currentValue = currentMatrix[i]?.[j] ?? 1
+    
+    if (showCustomInput[cellKey]) {
+      return 'custom'
+    }
+    
+    // Если значение не стандартное, показываем пользовательский ввод
+    if (!isStandardValue(currentValue)) {
+      return 'custom'
+    }
+    
+    return currentValue
+  }
+
   // Проверяем, является ли матрица единичной (все значения = 1)
   const isMatrixUnfilled = () => {
     if (!currentMatrix || currentMatrix.length === 0) return true
@@ -548,17 +605,47 @@ export default function PairwiseComparison({
                     {i === j ? (
                       <div className="text-center text-gray-600">1</div>
                     ) : i < j ? (
-                      <select
-                        value={currentMatrix[i]?.[j] ?? 1}
-                        onChange={(e) => updateMatrix(i, j, parseFloat(e.target.value))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
-                      >
-                        {COMPARISON_SCALE.map((scale) => (
-                          <option key={scale.value} value={scale.value}>
-                            {scale.value} - {scale.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="space-y-1">
+                        <select
+                          value={getSelectValue(i, j)}
+                          onChange={(e) => {
+                            const cellKey = `${i}-${j}`
+                            if (e.target.value === 'custom') {
+                              setShowCustomInput({ ...showCustomInput, [cellKey]: true })
+                              const currentValue = currentMatrix[i]?.[j] ?? 1
+                              setCustomFractionInputs({ ...customFractionInputs, [cellKey]: isStandardValue(currentValue) ? '' : decimalToFraction(currentValue) })
+                            } else {
+                              setShowCustomInput({ ...showCustomInput, [cellKey]: false })
+                              updateMatrix(i, j, parseFloat(e.target.value))
+                            }
+                          }}
+                          className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
+                        >
+                          {COMPARISON_SCALE.map((scale) => (
+                            <option key={scale.value} value={scale.value}>
+                              {scale.value} - {scale.label}
+                            </option>
+                          ))}
+                          <option value="custom">Другое (введите дробь, например: 1/4)</option>
+                        </select>
+                        {(showCustomInput[`${i}-${j}`] || !isStandardValue(currentMatrix[i]?.[j] ?? 1)) && (
+                          <input
+                            type="text"
+                            value={customFractionInputs[`${i}-${j}`] ?? (isStandardValue(currentMatrix[i]?.[j] ?? 1) ? '' : decimalToFraction(currentMatrix[i]?.[j] ?? 1))}
+                            onChange={(e) => {
+                              const cellKey = `${i}-${j}`
+                              setCustomFractionInputs({ ...customFractionInputs, [cellKey]: e.target.value })
+                              setShowCustomInput({ ...showCustomInput, [cellKey]: true })
+                              const decimalValue = fractionToDecimal(e.target.value)
+                              if (decimalValue !== null && decimalValue > 0) {
+                                updateMatrix(i, j, decimalValue)
+                              }
+                            }}
+                            placeholder="1/4 или 0.25"
+                            className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white text-sm"
+                          />
+                        )}
+                      </div>
                     ) : (
                       <div className="text-center text-gray-700">
                         {currentMatrix[i]?.[j] 

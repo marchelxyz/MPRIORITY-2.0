@@ -122,3 +122,51 @@ export function canConvertToFraction(decimal: number, maxDenominator: number = 1
   
   return false
 }
+
+/**
+ * Преобразует строку с дробью в десятичное число
+ * Поддерживает форматы: "1/4", "1 1/2", "0.25", "1"
+ * @param fractionStr - строка с дробью (например, "1/4" или "0.25")
+ * @returns десятичное число или null, если строка не может быть преобразована
+ */
+export function fractionToDecimal(fractionStr: string): number | null {
+  if (!fractionStr || typeof fractionStr !== 'string') {
+    return null
+  }
+  
+  const trimmed = fractionStr.trim()
+  
+  // Пробуем распарсить как обычное десятичное число
+  const decimalMatch = trimmed.match(/^-?\d+\.?\d*$/)
+  if (decimalMatch) {
+    const num = parseFloat(trimmed)
+    if (!isNaN(num)) {
+      return num
+    }
+  }
+  
+  // Пробуем распарсить как смешанную дробь (например, "1 1/2")
+  const mixedMatch = trimmed.match(/^(-?\d+)\s+(-?\d+)\/(-?\d+)$/)
+  if (mixedMatch) {
+    const wholePart = parseInt(mixedMatch[1], 10)
+    const numerator = parseInt(mixedMatch[2], 10)
+    const denominator = parseInt(mixedMatch[3], 10)
+    
+    if (denominator !== 0 && !isNaN(wholePart) && !isNaN(numerator) && !isNaN(denominator)) {
+      return wholePart + (numerator / denominator)
+    }
+  }
+  
+  // Пробуем распарсить как простую дробь (например, "1/4")
+  const fractionMatch = trimmed.match(/^(-?\d+)\/(-?\d+)$/)
+  if (fractionMatch) {
+    const numerator = parseInt(fractionMatch[1], 10)
+    const denominator = parseInt(fractionMatch[2], 10)
+    
+    if (denominator !== 0 && !isNaN(numerator) && !isNaN(denominator)) {
+      return numerator / denominator
+    }
+  }
+  
+  return null
+}
