@@ -193,16 +193,22 @@ export default function History({ onLoadAnalysis, onClose }: HistoryProps) {
                       <span className="text-gray-400">•</span>
                       <span>{formatDate(analysis.timestamp)}</span>
                     </div>
-                    <div className="mt-2">
-                      <span className="font-medium text-gray-700">Лучшая альтернатива: </span>
-                      <span className="text-gray-900">
-                        {analysis.results.globalPriorities[0]?.name} 
-                        {' '}
-                        <span className="text-primary-600">
-                          ({(analysis.results.globalPriorities[0]?.priority * 100).toFixed(1)}%)
+                    {analysis.results && analysis.results.globalPriorities && analysis.results.globalPriorities.length > 0 ? (
+                      <div className="mt-2">
+                        <span className="font-medium text-gray-700">Лучшая альтернатива: </span>
+                        <span className="text-gray-900">
+                          {analysis.results.globalPriorities[0]?.name} 
+                          {' '}
+                          <span className="text-primary-600">
+                            ({(analysis.results.globalPriorities[0]?.priority * 100).toFixed(1)}%)
+                          </span>
                         </span>
-                      </span>
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <span className="text-sm text-gray-500 italic">Результаты еще не рассчитаны</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

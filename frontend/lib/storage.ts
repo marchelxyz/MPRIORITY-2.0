@@ -11,7 +11,7 @@ export interface SavedAnalysis {
   alternatives: string[]
   levels?: Array<{ name: string; items: string[] }>
   isMultiLevel?: boolean
-  results: {
+  results?: {
     criteriaConsistency: any
     alternativeConsistencies: any[]
     globalPriorities: Array<{
@@ -21,7 +21,7 @@ export interface SavedAnalysis {
     }>
     alternativePrioritiesByCriteria: number[][]
     criteriaPriorities: number[]
-  }
+  } | null
   criteriaMatrix: number[][]
   alternativeMatrices: number[][][]
   multiLevelMatrices?: Record<string, number[][] | number[][][]>
