@@ -5,6 +5,7 @@ import HierarchyBuilder from '@/components/HierarchyBuilder'
 import PairwiseComparison from '@/components/PairwiseComparison'
 import Results from '@/components/Results'
 import History from '@/components/History'
+import TeleagentLogo from '@/components/TeleagentLogo'
 import { CheckCircle2, History as HistoryIcon } from 'lucide-react'
 import { SavedAnalysis, saveAnalysis } from '@/lib/storage'
 
@@ -468,7 +469,9 @@ export default function Home() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex-1"></div>
+            <div className="flex-1 flex justify-start">
+              <TeleagentLogo />
+            </div>
             <div className="flex-1">
               <h1 className="text-4xl font-bold text-gray-900 mb-2">
                 MPRIORITY 2.0
