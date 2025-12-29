@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import HierarchyBuilder from '@/components/HierarchyBuilder'
 import PairwiseComparison from '@/components/PairwiseComparison'
 import Results from '@/components/Results'
@@ -31,6 +31,20 @@ export default function Home() {
   const [results, setResults] = useState<any>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [currentAnalysisId, setCurrentAnalysisId] = useState<string | null>(null)
+  const [showFractions, setShowFractions] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('showFractions')
+      return saved === 'true'
+    }
+    return false
+  })
+  
+  // Сохраняем состояние флажка в localStorage при изменении
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showFractions', showFractions.toString())
+    }
+  }, [showFractions])
 
   // Автоматическое сохранение в базу данных на каждом этапе
   const autoSave = async (
@@ -208,6 +222,9 @@ export default function Home() {
   const calculateMultiLevelResults = async (matrices?: Record<string, number[][] | number[][][]>) => {
     const matricesToUse = matrices || multiLevelMatrices
     
+    // Сбрасываем состояние флажка при переходе к результатам
+    setShowFractions(false)
+    
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
       const response = await fetch(`${apiUrl}/api/calculate-global-priorities`, {
@@ -256,6 +273,8 @@ export default function Home() {
     criteriaMatrixData: number[][],
     alternativeMatricesData: number[][][]
   ) => {
+    // Сбрасываем состояние флажка при переходе к результатам
+    setShowFractions(false)
     try {
       // Валидация входных данных
       if (!criteriaMatrixData || criteriaMatrixData.length === 0) {
@@ -375,6 +394,7 @@ export default function Home() {
     setCurrentComparisonLevel(0)
     setResults(null)
     setCurrentAnalysisId(null)
+    setShowFractions(false)
   }
 
   const handleLoadAnalysis = (analysis: SavedAnalysis) => {
@@ -415,6 +435,7 @@ export default function Home() {
     if (analysis.results) {
       setResults(analysis.results)
       setStep('results')
+      setShowFractions(false) // Сбрасываем флажок при переходе к результатам
     } else {
       // Вычисляем результаты сразу, используя загруженные данные напрямую
       if (loadedHierarchy.isMultiLevel && analysis.multiLevelMatrices) {
@@ -516,6 +537,8 @@ export default function Home() {
                   criteria={currentComparisonLevel > 0 
                     ? hierarchy.levels[currentComparisonLevel - 1]?.items || []
                     : undefined}
+                  showFractions={showFractions}
+                  onShowFractionsChange={setShowFractions}
                   onComplete={handleCriteriaComplete}
                   onBack={() => {
                     if (currentComparisonLevel > 0) {
@@ -530,6 +553,8 @@ export default function Home() {
                   title="Сравнение критериев"
                   items={hierarchy.criteria}
                   matrix={criteriaMatrix}
+                  showFractions={showFractions}
+                  onShowFractionsChange={setShowFractions}
                   onComplete={handleCriteriaComplete}
                   onBack={() => setStep('hierarchy')}
                 />
@@ -543,6 +568,8 @@ export default function Home() {
               items={hierarchy.alternatives}
               matrices={alternativeMatrices}
               criteria={hierarchy.criteria}
+              showFractions={showFractions}
+              onShowFractionsChange={setShowFractions}
               onComplete={handleAlternativesComplete}
               onBack={() => setStep('criteria')}
             />

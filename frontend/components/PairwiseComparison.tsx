@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react'
 import HelpTooltip from './HelpTooltip'
-import { decimalToFraction } from '@/lib/fractions'
+import { decimalToFraction, fractionToDecimal } from '@/lib/fractions'
 
 interface PairwiseComparisonProps {
   title: string
@@ -11,20 +11,30 @@ interface PairwiseComparisonProps {
   matrix?: number[][]
   matrices?: number[][][]
   criteria?: string[]
+  showFractions: boolean
+  onShowFractionsChange: (value: boolean) => void
   onComplete: (matrix: number[][] | number[][][]) => void
   onBack: () => void
 }
 
 const COMPARISON_SCALE = [
-  { value: 1, label: 'Равная важность' },
-  { value: 2, label: 'Немного важнее' },
-  { value: 3, label: 'Умеренно важнее' },
-  { value: 4, label: 'Значительно важнее' },
-  { value: 5, label: 'Существенно важнее' },
-  { value: 6, label: 'Очень важнее' },
-  { value: 7, label: 'Крайне важнее' },
-  { value: 8, label: 'Очень сильно важнее' },
-  { value: 9, label: 'Абсолютно важнее' },
+  { value: 1/9, label: '1/9 - Абсолютно менее важно' },
+  { value: 1/8, label: '1/8 - Очень сильно менее важно' },
+  { value: 1/7, label: '1/7 - Крайне менее важно' },
+  { value: 1/6, label: '1/6 - Очень менее важно' },
+  { value: 1/5, label: '1/5 - Существенно менее важно' },
+  { value: 1/4, label: '1/4 - Значительно менее важно' },
+  { value: 1/3, label: '1/3 - Умеренно менее важно' },
+  { value: 1/2, label: '1/2 - Немного менее важно' },
+  { value: 1, label: '1 - Равная важность' },
+  { value: 2, label: '2 - Немного важнее' },
+  { value: 3, label: '3 - Умеренно важнее' },
+  { value: 4, label: '4 - Значительно важнее' },
+  { value: 5, label: '5 - Существенно важнее' },
+  { value: 6, label: '6 - Очень важнее' },
+  { value: 7, label: '7 - Крайне важнее' },
+  { value: 8, label: '8 - Очень сильно важнее' },
+  { value: 9, label: '9 - Абсолютно важнее' },
 ]
 
 export default function PairwiseComparison({
@@ -33,6 +43,8 @@ export default function PairwiseComparison({
   matrix,
   matrices,
   criteria,
+  showFractions,
+  onShowFractionsChange,
   onComplete,
   onBack
 }: PairwiseComparisonProps) {
@@ -41,7 +53,6 @@ export default function PairwiseComparison({
   const [currentCriteriaIndex, setCurrentCriteriaIndex] = useState(0)
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
-  const [showFractions, setShowFractions] = useState(false)
 
   // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
@@ -122,6 +133,7 @@ export default function PairwiseComparison({
       }
     }
   }, [currentCriteriaIndex]) // Только при изменении индекса
+
 
   const updateMatrix = (i: number, j: number, value: number) => {
     // Проверяем, что матрица инициализирована
@@ -370,6 +382,32 @@ export default function PairwiseComparison({
     ? `${title} по критерию: "${criteria[currentCriteriaIndex]}"`
     : title
 
+  // Находит ближайшее значение из шкалы для отображения в select
+  const findClosestScaleValue = (value: number): number => {
+    const precision = 0.0001 // Точность для сравнения чисел с плавающей точкой
+    
+    // Сначала проверяем точное совпадение
+    for (const scale of COMPARISON_SCALE) {
+      if (Math.abs(value - scale.value) < precision) {
+        return scale.value
+      }
+    }
+    
+    // Если точного совпадения нет, находим ближайшее
+    let closest = COMPARISON_SCALE[0].value
+    let minDiff = Math.abs(value - closest)
+    
+    for (const scale of COMPARISON_SCALE) {
+      const diff = Math.abs(value - scale.value)
+      if (diff < minDiff) {
+        minDiff = diff
+        closest = scale.value
+      }
+    }
+    
+    return closest
+  }
+
   // Проверяем, является ли матрица единичной (все значения = 1)
   const isMatrixUnfilled = () => {
     if (!currentMatrix || currentMatrix.length === 0) return true
@@ -549,13 +587,13 @@ export default function PairwiseComparison({
                       <div className="text-center text-gray-600">1</div>
                     ) : i < j ? (
                       <select
-                        value={currentMatrix[i]?.[j] ?? 1}
+                        value={findClosestScaleValue(currentMatrix[i]?.[j] ?? 1)}
                         onChange={(e) => updateMatrix(i, j, parseFloat(e.target.value))}
                         className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                       >
                         {COMPARISON_SCALE.map((scale) => (
                           <option key={scale.value} value={scale.value}>
-                            {scale.value} - {scale.label}
+                            {scale.label}
                           </option>
                         ))}
                       </select>
@@ -582,7 +620,7 @@ export default function PairwiseComparison({
           <input
             type="checkbox"
             checked={showFractions}
-            onChange={(e) => setShowFractions(e.target.checked)}
+            onChange={(e) => onShowFractionsChange(e.target.checked)}
             className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
           />
           <span className="text-sm text-gray-700">
