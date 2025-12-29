@@ -42,11 +42,14 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
   const [analysisModel, setAnalysisModel] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
+  const [isSavingHTML, setIsSavingHTML] = useState(false)
+  const [isSavingImage, setIsSavingImage] = useState(false)
   const [analysisRequested, setAnalysisRequested] = useState(false)
   
   const hierarchyGraphRef = useRef<HTMLDivElement>(null)
   const barChartRef = useRef<HTMLDivElement>(null)
   const pieChartRef = useRef<HTMLDivElement>(null)
+  const resultsContainerRef = useRef<HTMLDivElement>(null)
 
   const chartData = results.globalPriorities.map((alt, index) => ({
     name: alt.name,
@@ -508,12 +511,29 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         })
         yPos += 3
 
-        // Убираем markdown разметку для простого текста
-        const plainAnalysis = analysis.replace(/#{1,6}\s/g, '').replace(/\*\*/g, '').replace(/\*/g, '')
-        yPos = await addTextAsImage(plainAnalysis, margin, yPos, {
-          fontSize: 8,
-          maxWidth: pageWidth - 2 * margin
-        })
+        // Конвертируем markdown в читаемый текст для PDF
+        let pdfAnalysis = analysis
+        // Убираем markdown разметку, но сохраняем структуру
+        pdfAnalysis = pdfAnalysis.replace(/^### (.*)$/gm, '\n$1\n')
+        pdfAnalysis = pdfAnalysis.replace(/^## (.*)$/gm, '\n$1\n')
+        pdfAnalysis = pdfAnalysis.replace(/^# (.*)$/gm, '\n$1\n')
+        pdfAnalysis = pdfAnalysis.replace(/\*\*(.*?)\*\*/g, '$1') // Убираем жирный, но оставляем текст
+        pdfAnalysis = pdfAnalysis.replace(/\*(.*?)\*/g, '$1') // Убираем курсив, но оставляем текст
+        pdfAnalysis = pdfAnalysis.replace(/`([^`]+)`/g, '$1') // Убираем код, но оставляем текст
+        
+        // Разбиваем на части для лучшей читаемости
+        const analysisParts = pdfAnalysis.split('\n').filter(p => p.trim())
+        for (const part of analysisParts) {
+          if (yPos > pageHeight - 20) {
+            doc.addPage('l')
+            yPos = margin
+          }
+          yPos = await addTextAsImage(part.trim(), margin, yPos, {
+            fontSize: 8,
+            maxWidth: pageWidth - 2 * margin
+          })
+          yPos += 2
+        }
       }
 
       // Футер - добавляем на каждую страницу
@@ -560,8 +580,391 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
     }
   }
 
+  // Сохранение в HTML формат с сохранением всех стилей
+  const saveAsHTML = async () => {
+    setIsSavingHTML(true)
+    try {
+      if (!resultsContainerRef.current) {
+        throw new Error('Контейнер результатов не найден')
+      }
+
+      // Сначала получаем все изображения асинхронно
+      let hierarchyGraphImg = '<p>Граф недоступен</p>'
+      let barChartImg = '<p>График недоступен</p>'
+      let pieChartImg = '<p>График недоступен</p>'
+
+      if (hierarchyGraphRef.current) {
+        try {
+          const canvas = await html2canvas(hierarchyGraphRef.current, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            useCORS: true,
+            windowWidth: hierarchyGraphRef.current.scrollWidth,
+            windowHeight: hierarchyGraphRef.current.scrollHeight
+          })
+          hierarchyGraphImg = `<img src="${canvas.toDataURL('image/png')}" alt="Иерархический граф" style="max-width: 100%; height: auto;" />`
+        } catch (error) {
+          console.error('Ошибка при создании изображения графа:', error)
+        }
+      }
+
+      if (barChartRef.current) {
+        try {
+          const canvas = await html2canvas(barChartRef.current, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            useCORS: true
+          })
+          barChartImg = `<img src="${canvas.toDataURL('image/png')}" alt="График приоритетов альтернатив" style="max-width: 100%; height: auto;" />`
+        } catch (error) {
+          console.error('Ошибка при создании изображения bar chart:', error)
+        }
+      }
+
+      if (pieChartRef.current) {
+        try {
+          const canvas = await html2canvas(pieChartRef.current, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            useCORS: true
+          })
+          pieChartImg = `<img src="${canvas.toDataURL('image/png')}" alt="График приоритетов критериев" style="max-width: 100%; height: auto;" />`
+        } catch (error) {
+          console.error('Ошибка при создании изображения pie chart:', error)
+        }
+      }
+
+      // Функция для конвертации markdown в HTML
+      const markdownToHTML = (text: string): string => {
+        let html = text
+        // Заголовки
+        html = html.replace(/^### (.*)$/gm, '<h4>$1</h4>')
+        html = html.replace(/^## (.*)$/gm, '<h3>$1</h3>')
+        html = html.replace(/^# (.*)$/gm, '<h2>$1</h2>')
+        // Жирный текст
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        html = html.replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // Код
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>')
+        // Разбиваем на параграфы
+        const lines = html.split('\n')
+        const paragraphs: string[] = []
+        let currentParagraph = ''
+        
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed) {
+            if (currentParagraph) {
+              paragraphs.push(`<p>${currentParagraph}</p>`)
+              currentParagraph = ''
+            }
+          } else if (trimmed.startsWith('<h') || trimmed.startsWith('<ul') || trimmed.startsWith('<ol')) {
+            if (currentParagraph) {
+              paragraphs.push(`<p>${currentParagraph}</p>`)
+              currentParagraph = ''
+            }
+            paragraphs.push(trimmed)
+          } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            if (currentParagraph) {
+              paragraphs.push(`<p>${currentParagraph}</p>`)
+              currentParagraph = ''
+            }
+            paragraphs.push(`<ul><li>${trimmed.substring(2)}</li></ul>`)
+          } else if (/^\d+\./.test(trimmed)) {
+            if (currentParagraph) {
+              paragraphs.push(`<p>${currentParagraph}</p>`)
+              currentParagraph = ''
+            }
+            paragraphs.push(`<ol><li>${trimmed.replace(/^\d+\./, '').trim()}</li></ol>`)
+          } else {
+            currentParagraph += (currentParagraph ? ' ' : '') + trimmed
+          }
+        }
+        if (currentParagraph) {
+          paragraphs.push(`<p>${currentParagraph}</p>`)
+        }
+        return paragraphs.join('\n')
+      }
+
+      // Создаем HTML документ с инлайн стилями
+      const htmlContent = `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MPRIORITY 2.0 - Результаты анализа</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      background: linear-gradient(to bottom right, #eff6ff, #ffffff, #faf5ff);
+      padding: 20px;
+      color: #111827;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    h1 { font-size: 2rem; font-weight: bold; margin-bottom: 8px; }
+    h2 { font-size: 1.5rem; font-weight: bold; margin-top: 32px; margin-bottom: 16px; }
+    h3 { font-size: 1.25rem; font-weight: 600; margin-top: 24px; margin-bottom: 12px; }
+    p { margin-bottom: 12px; line-height: 1.6; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f9fafb;
+      font-weight: 600;
+    }
+    .section {
+      margin-bottom: 32px;
+      padding: 24px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .chart-container {
+      margin: 16px 0;
+      padding: 16px;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .analysis {
+      background: linear-gradient(to bottom right, #faf5ff, #eff6ff);
+      border: 1px solid #c4b5fd;
+      border-radius: 8px;
+      padding: 24px;
+      margin: 24px 0;
+    }
+    .analysis h3 {
+      color: #7c3aed;
+      margin-bottom: 16px;
+    }
+    .analysis p {
+      color: #374151;
+      margin-bottom: 12px;
+    }
+    .analysis ul, .analysis ol {
+      margin-left: 24px;
+      margin-bottom: 12px;
+    }
+    .analysis li {
+      margin-bottom: 8px;
+    }
+    .analysis strong {
+      font-weight: 600;
+      color: #111827;
+    }
+    .analysis code {
+      background-color: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.875rem;
+    }
+    .footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+      text-align: center;
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>MPRIORITY 2.0 - Результаты анализа</h1>
+    <p><strong>Дата создания:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+    <p><strong>Цель анализа:</strong> ${hierarchy.goal}</p>
+    
+    <div class="section">
+      <h2>Иерархический граф</h2>
+      <div class="chart-container">
+        ${hierarchyGraphImg}
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Ранжирование альтернатив</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Ранг</th>
+            <th>Альтернатива</th>
+            <th>Глобальный приоритет</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results.globalPriorities.map(alt => `
+            <tr>
+              <td>${alt.rank}</td>
+              <td>${alt.name}</td>
+              <td>${(alt.priority * 100).toFixed(2)}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Графики</h2>
+      <div class="chart-container">
+        <h3>Глобальные приоритеты альтернатив</h3>
+        ${barChartImg}
+      </div>
+      
+      <div class="chart-container">
+        <h3>Приоритеты критериев</h3>
+        ${pieChartImg}
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Приоритеты критериев</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Критерий</th>
+            <th>Приоритет</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hierarchy.criteria.map((crit, idx) => `
+            <tr>
+              <td>${crit}</td>
+              <td>${(results.criteriaPriorities[idx] * 100).toFixed(2)}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Детальная таблица приоритетов</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Альтернатива</th>
+            ${hierarchy.criteria.map(crit => `<th>${crit}</th>`).join('')}
+            <th>Глобальный приоритет</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${hierarchy.alternatives.map((alt, altIndex) => `
+            <tr>
+              <td>${alt}</td>
+              ${hierarchy.criteria.map((crit, critIndex) => `
+                <td>${(results.alternativePrioritiesByCriteria[critIndex][altIndex] * 100).toFixed(2)}%</td>
+              `).join('')}
+              <td>${(results.globalPriorities.find(a => a.name === alt)?.priority! * 100).toFixed(2)}%</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>Согласованность суждений</h2>
+      <p><strong>Критерии:</strong> CR = ${(results.criteriaConsistency.cr * 100).toFixed(2)}% ${results.criteriaConsistency.isConsistent ? '(приемлемо)' : '(низкая согласованность)'}</p>
+      ${results.alternativeConsistencies.map((cons, idx) => {
+        const isApplicable = cons.isApplicable !== false
+        return `<p><strong>${hierarchy.criteria[idx]}:</strong> ${
+          isApplicable 
+            ? `CR = ${(cons.cr * 100).toFixed(2)}% ${cons.isConsistent ? '(приемлемо)' : '(низкая согласованность)'}`
+            : `Согласованность не применяется (матрица ${cons.n}x${cons.n})`
+        }</p>`
+      }).join('')}
+    </div>
+
+    ${analysis ? `
+    <div class="analysis">
+      <h3>Заключение и детальный анализ результатов</h3>
+      ${analysisModel ? `<p style="font-size: 0.875rem; color: #7c3aed; margin-bottom: 16px;"><strong>Модель:</strong> ${analysisModel}</p>` : ''}
+      <div>${markdownToHTML(analysis)}</div>
+    </div>
+    ` : ''}
+
+    <div class="footer">
+      <p>Сгенерировано MPRIORITY 2.0 - ${new Date().toLocaleString('ru-RU')}</p>
+    </div>
+  </div>
+</body>
+</html>
+      `
+
+      // Создаем blob и скачиваем
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mpriority-results-${Date.now()}.html`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Ошибка при сохранении HTML:', error)
+      alert('Ошибка при сохранении HTML: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'))
+    } finally {
+      setIsSavingHTML(false)
+    }
+  }
+
+  // Сохранение всего контейнера как изображение
+  const saveAsImage = async () => {
+    setIsSavingImage(true)
+    try {
+      if (!resultsContainerRef.current) {
+        throw new Error('Контейнер результатов не найден')
+      }
+
+      // Ждем немного, чтобы все элементы загрузились
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      const canvas = await html2canvas(resultsContainerRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        windowWidth: resultsContainerRef.current.scrollWidth,
+        windowHeight: resultsContainerRef.current.scrollHeight,
+        allowTaint: true
+      })
+
+      // Создаем ссылку для скачивания
+      const link = document.createElement('a')
+      link.download = `mpriority-results-${Date.now()}.png`
+      link.href = canvas.toDataURL('image/png', 1.0)
+      link.click()
+    } catch (error) {
+      console.error('Ошибка при сохранении изображения:', error)
+      alert('Ошибка при сохранении изображения: ' + (error instanceof Error ? error.message : 'Неизвестная ошибка'))
+    } finally {
+      setIsSavingImage(false)
+    }
+  }
+
   return (
-    <div className="space-y-8">
+    <div ref={resultsContainerRef} className="space-y-8">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
@@ -702,9 +1105,46 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             )}
           </button>
           <button
+            onClick={saveAsImage}
+            disabled={isSavingImage}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Сохранить отчет как изображение (PNG) в точном виде с экрана"
+          >
+            {isSavingImage ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <Download size={18} />
+                PNG
+              </>
+            )}
+          </button>
+          <button
+            onClick={saveAsHTML}
+            disabled={isSavingHTML}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Сохранить отчет в HTML формате с сохранением всех стилей и форматирования"
+          >
+            {isSavingHTML ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Сохранение...
+              </>
+            ) : (
+              <>
+                <FileText size={18} />
+                HTML
+              </>
+            )}
+          </button>
+          <button
             onClick={generatePDF}
             disabled={isGeneratingPDF}
             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Сохранить отчет в PDF формате"
           >
             {isGeneratingPDF ? (
               <>
@@ -714,7 +1154,7 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
             ) : (
               <>
                 <FileText size={18} />
-                Сохранить PDF
+                PDF
               </>
             )}
           </button>
