@@ -6,7 +6,6 @@ import { RotateCcw, Download, CheckCircle2, AlertCircle, Brain, FileText, Loader
 import HierarchyGraph from './HierarchyGraph'
 import HelpTooltip from './HelpTooltip'
 import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import ReactMarkdown from 'react-markdown'
 import html2canvas from 'html2canvas'
 
@@ -198,6 +197,114 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         return y + imgHeight + 3
       }
 
+      // Функция для добавления таблицы с поддержкой кириллицы через html2canvas
+      const addTableAsImage = async (
+        headers: string[], 
+        rows: string[][], 
+        x: number, 
+        y: number, 
+        options?: {
+          maxWidth?: number
+          headFillColor?: string
+          headTextColor?: string
+          fontSize?: number
+          columnStyles?: Record<number, { cellWidth?: number; fontStyle?: string; fillColor?: string | number[] }>
+        }
+      ): Promise<number> => {
+        const tableDiv = document.createElement('div')
+        tableDiv.style.position = 'absolute'
+        tableDiv.style.left = '-9999px'
+        tableDiv.style.top = '-9999px'
+        const tableMaxWidth = (options?.maxWidth || pageWidth - 2 * margin) * 3.779527559
+        tableDiv.style.width = `${tableMaxWidth}px`
+        tableDiv.style.fontFamily = 'Arial, sans-serif'
+        tableDiv.style.fontSize = `${(options?.fontSize || 9) * 2.834645669}px`
+        
+        const table = document.createElement('table')
+        table.style.borderCollapse = 'collapse'
+        table.style.width = '100%'
+        table.style.border = '1px solid #000000'
+        
+        // Заголовок таблицы
+        const thead = document.createElement('thead')
+        const headerRow = document.createElement('tr')
+        headerRow.style.backgroundColor = options?.headFillColor || '#0ea5e9'
+        headers.forEach((header, colIndex) => {
+          const th = document.createElement('th')
+          th.textContent = header
+          th.style.border = '1px solid #000000'
+          th.style.padding = '4px 8px'
+          th.style.textAlign = 'left'
+          th.style.fontWeight = 'bold'
+          th.style.color = options?.headTextColor || '#ffffff'
+          th.style.backgroundColor = options?.headFillColor || '#0ea5e9'
+          if (options?.columnStyles?.[colIndex]?.cellWidth) {
+            th.style.width = `${(options.columnStyles[colIndex].cellWidth! / (pageWidth - 2 * margin)) * 100}%`
+          }
+          headerRow.appendChild(th)
+        })
+        thead.appendChild(headerRow)
+        table.appendChild(thead)
+        
+        // Тело таблицы
+        const tbody = document.createElement('tbody')
+        rows.forEach((row, rowIndex) => {
+          const tr = document.createElement('tr')
+          row.forEach((cell, colIndex) => {
+            const td = document.createElement('td')
+            td.textContent = cell
+            td.style.border = '1px solid #000000'
+            td.style.padding = '4px 8px'
+            td.style.textAlign = 'left'
+            if (options?.columnStyles?.[colIndex]) {
+              const colStyle = options.columnStyles[colIndex]
+              if (colStyle.fontStyle === 'bold') {
+                td.style.fontWeight = 'bold'
+              }
+              if (colStyle.fillColor) {
+                // Поддерживаем как строку формата 'rgb(...)', так и массив чисел
+                if (typeof colStyle.fillColor === 'string') {
+                  td.style.backgroundColor = colStyle.fillColor
+                } else if (Array.isArray(colStyle.fillColor)) {
+                  td.style.backgroundColor = `rgb(${colStyle.fillColor.join(',')})`
+                }
+              }
+              if (colStyle.cellWidth) {
+                td.style.width = `${(colStyle.cellWidth / (pageWidth - 2 * margin)) * 100}%`
+              }
+            }
+            tr.appendChild(td)
+          })
+          tbody.appendChild(tr)
+        })
+        table.appendChild(tbody)
+        
+        tableDiv.appendChild(table)
+        document.body.appendChild(tableDiv)
+        
+        const canvas = await html2canvas(tableDiv, {
+          backgroundColor: '#ffffff',
+          scale: 1.5,
+          logging: false,
+          useCORS: true,
+          width: tableDiv.offsetWidth,
+          height: tableDiv.offsetHeight
+        })
+        
+        document.body.removeChild(tableDiv)
+        const imgData = canvas.toDataURL('image/png')
+        const imgWidth = options?.maxWidth || pageWidth - 2 * margin
+        const imgHeight = (canvas.height / canvas.width) * imgWidth
+        
+        if (y + imgHeight > pageHeight - 15) {
+          doc.addPage('l')
+          y = margin
+        }
+        
+        doc.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight)
+        return y + imgHeight + 5
+      }
+
       // Заголовок
       yPos = await addTextAsImage('MPRIORITY 2.0 - Результаты анализа', margin, yPos, {
         fontSize: 16,
@@ -302,16 +409,18 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         `${(alt.priority * 100).toFixed(2)}%`
       ])
 
-      autoTable(doc, {
-        head: [['Ранг', 'Альтернатива', 'Глобальный приоритет']],
-        body: rankingData,
-        startY: yPos,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [14, 165, 233], textColor: 255, fontStyle: 'bold' }
-      })
-
-      yPos = (doc as any).lastAutoTable.finalY + 10
+      yPos = await addTableAsImage(
+        ['Ранг', 'Альтернатива', 'Глобальный приоритет'],
+        rankingData,
+        margin,
+        yPos,
+        {
+          maxWidth: pageWidth - 2 * margin,
+          headFillColor: '#0ea5e9',
+          headTextColor: '#ffffff',
+          fontSize: 9
+        }
+      )
 
       // График бар-чарта
       if (barChartRef.current) {
@@ -372,16 +481,18 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
       ])
 
-      autoTable(doc, {
-        head: [['Критерий', 'Приоритет']],
-        body: criteriaData,
-        startY: yPos,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: 'bold' }
-      })
-
-      yPos = (doc as any).lastAutoTable.finalY + 10
+      yPos = await addTableAsImage(
+        ['Критерий', 'Приоритет'],
+        criteriaData,
+        margin,
+        yPos,
+        {
+          maxWidth: pageWidth - 2 * margin,
+          headFillColor: '#8b5cf6',
+          headTextColor: '#ffffff',
+          fontSize: 9
+        }
+      )
 
       // График пирога
       if (pieChartRef.current) {
@@ -449,20 +560,29 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
 
       const detailTableHeaders = ['Альтернатива', ...hierarchy.criteria, 'Глобальный приоритет']
 
-      autoTable(doc, {
-        head: [detailTableHeaders],
-        body: detailTableData,
-        startY: yPos,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [59, 130, 246], textColor: 255, fontStyle: 'bold', fontSize: 8 },
-        columnStyles: {
-          0: { cellWidth: 40 },
-          [detailTableHeaders.length - 1]: { fontStyle: 'bold', fillColor: [219, 234, 254] }
-        }
-      })
+      // Создаем стили для колонок
+      const columnStyles: Record<number, { cellWidth?: number; fontStyle?: string; fillColor?: string }> = {
+        0: { cellWidth: 40 }
+      }
+      // Последняя колонка (глобальный приоритет) - жирный и с фоном
+      columnStyles[detailTableHeaders.length - 1] = {
+        fontStyle: 'bold',
+        fillColor: 'rgb(219, 234, 254)'
+      }
 
-      yPos = (doc as any).lastAutoTable.finalY + 10
+      yPos = await addTableAsImage(
+        detailTableHeaders,
+        detailTableData,
+        margin,
+        yPos,
+        {
+          maxWidth: pageWidth - 2 * margin,
+          headFillColor: '#3b82f6',
+          headTextColor: '#ffffff',
+          fontSize: 8,
+          columnStyles
+        }
+      )
 
       // Согласованность
       if (yPos > pageHeight - 30) {
