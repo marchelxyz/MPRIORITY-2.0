@@ -49,7 +49,22 @@ export default function PairwiseComparison({
   const [currentCriteriaIndex, setCurrentCriteriaIndex] = useState(0)
   const [consistency, setConsistency] = useState<any>(null)
   const [isChecking, setIsChecking] = useState(false)
-  const [showFractions, setShowFractions] = useState(false)
+  
+  // Восстанавливаем состояние флажка из localStorage
+  const [showFractions, setShowFractions] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('showFractions')
+      return saved === 'true'
+    }
+    return false
+  })
+  
+  // Сохраняем состояние флажка в localStorage при изменении
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showFractions', showFractions.toString())
+    }
+  }, [showFractions])
 
   // Инициализация матриц только при изменении пропсов (не при изменении индекса)
   useEffect(() => {
