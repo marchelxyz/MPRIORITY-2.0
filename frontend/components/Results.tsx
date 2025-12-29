@@ -466,147 +466,43 @@ export default function Results({ hierarchy, results, criteriaMatrix, alternativ
         }
       )
 
-      // График бар-чарта и таблица приоритетов критериев на одной странице
-      if (barChartRef.current) {
+      // Таблица приоритетов критериев
+      if (yPos > pageHeight - 30) {
         doc.addPage('l')
         yPos = margin
-        
-        // Заголовок для графика
-        yPos = await addTextAsImage('Глобальные приоритеты альтернатив:', margin, yPos, {
-          fontSize: 12,
-          fontStyle: 'bold',
-          maxWidth: pageWidth - 2 * margin
-        })
-        yPos += 5
-
-        const barChartCanvas = await html2canvas(barChartRef.current, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-          logging: false,
-          useCORS: true,
-          windowWidth: barChartRef.current.scrollWidth,
-          windowHeight: barChartRef.current.scrollHeight
-        })
-        
-        const barChartImgData = barChartCanvas.toDataURL('image/png')
-        // Выделяем место для графика и таблицы на одной странице
-        // График занимает примерно 60% доступной высоты
-        const availableHeightForCharts = pageHeight - yPos - 80 // Оставляем место для таблицы
-        const barChartImgWidth = pageWidth - 2 * margin
-        const barChartImgHeight = (barChartCanvas.height / barChartCanvas.width) * barChartImgWidth
-        
-        // Ограничиваем высоту графика, чтобы поместилась таблица
-        const finalChartHeight = Math.min(barChartImgHeight, availableHeightForCharts)
-        const finalChartWidth = pageWidth - 2 * margin
-        
-        doc.addImage(barChartImgData, 'PNG', margin, yPos, finalChartWidth, finalChartHeight)
-        yPos += finalChartHeight + 10
-
-        // Проверяем, поместится ли таблица на этой странице
-        if (yPos > pageHeight - 50) {
-          doc.addPage('l')
-          yPos = margin
-        }
-
-        // Приоритеты критериев - на той же странице
-        yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
-          fontSize: 11,
-          fontStyle: 'bold',
-          maxWidth: pageWidth - 2 * margin
-        })
-        yPos += 3
-
-        const criteriaData = hierarchy.criteria.map((crit, idx) => [
-          crit,
-          `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
-        ])
-
-        yPos = await addTableAsImage(
-          ['Критерий', 'Приоритет'],
-          criteriaData,
-          margin,
-          yPos,
-          {
-            maxWidth: pageWidth - 2 * margin,
-            headFillColor: '#8b5cf6',
-            headTextColor: '#ffffff',
-            fontSize: 9
-          }
-        )
-      } else {
-        // Если графика нет, просто добавляем таблицу приоритетов критериев
-        if (yPos > pageHeight - 30) {
-          doc.addPage('l')
-          yPos = margin
-        }
-
-        yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
-          fontSize: 11,
-          fontStyle: 'bold',
-          maxWidth: pageWidth - 2 * margin
-        })
-        yPos += 3
-
-        const criteriaData = hierarchy.criteria.map((crit, idx) => [
-          crit,
-          `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
-        ])
-
-        // Определяем ширину колонок для таблицы приоритетов критериев
-        const criteriaColumnStyles: Record<number, { cellWidth?: number; fontStyle?: string; fillColor?: string }> = {
-          0: { cellWidth: (pageWidth - 2 * margin) * 0.7 }, // 70% для названия критерия
-          1: { cellWidth: (pageWidth - 2 * margin) * 0.3 }  // 30% для приоритета
-        }
-
-        yPos = await addTableAsImage(
-          ['Критерий', 'Приоритет'],
-          criteriaData,
-          margin,
-          yPos,
-          {
-            maxWidth: pageWidth - 2 * margin,
-            headFillColor: '#8b5cf6',
-            headTextColor: '#ffffff',
-            fontSize: 9,
-            columnStyles: criteriaColumnStyles
-          }
-        )
       }
 
-      // График пирога - занимает целую страницу
-      if (pieChartRef.current) {
-        doc.addPage('l')
-        yPos = margin
-        
-        yPos = await addTextAsImage('Приоритеты критериев (график):', margin, yPos, {
-          fontSize: 12,
-          fontStyle: 'bold',
-          maxWidth: pageWidth - 2 * margin
-        })
-        yPos += 5
+      yPos = await addTextAsImage('Приоритеты критериев:', margin, yPos, {
+        fontSize: 11,
+        fontStyle: 'bold',
+        maxWidth: pageWidth - 2 * margin
+      })
+      yPos += 3
 
-        const pieChartCanvas = await html2canvas(pieChartRef.current, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-          logging: false,
-          useCORS: true,
-          windowWidth: pieChartRef.current.scrollWidth,
-          windowHeight: pieChartRef.current.scrollHeight
-        })
-        
-        const pieChartImgData = pieChartCanvas.toDataURL('image/png')
-        // Используем всю доступную высоту страницы
-        const availableHeight = pageHeight - yPos - 15
-        const pieChartImgWidth = pageWidth - 2 * margin
-        const pieChartImgHeight = (pieChartCanvas.height / pieChartCanvas.width) * pieChartImgWidth
-        
-        // Увеличиваем график до размера страницы
-        const finalPieHeight = Math.min(pieChartImgHeight, availableHeight)
-        const finalPieWidth = pageWidth - 2 * margin
-        
-        doc.addImage(pieChartImgData, 'PNG', margin, yPos, finalPieWidth, finalPieHeight)
-        yPos += finalPieHeight + 5
+      const criteriaData = hierarchy.criteria.map((crit, idx) => [
+        crit,
+        `${(results.criteriaPriorities[idx] * 100).toFixed(2)}%`
+      ])
+
+      // Определяем ширину колонок для таблицы приоритетов критериев
+      const criteriaColumnStyles: Record<number, { cellWidth?: number; fontStyle?: string; fillColor?: string }> = {
+        0: { cellWidth: (pageWidth - 2 * margin) * 0.7 }, // 70% для названия критерия
+        1: { cellWidth: (pageWidth - 2 * margin) * 0.3 }  // 30% для приоритета
       }
+
+      yPos = await addTableAsImage(
+        ['Критерий', 'Приоритет'],
+        criteriaData,
+        margin,
+        yPos,
+        {
+          maxWidth: pageWidth - 2 * margin,
+          headFillColor: '#8b5cf6',
+          headTextColor: '#ffffff',
+          fontSize: 9,
+          columnStyles: criteriaColumnStyles
+        }
+      )
 
       // Детальная таблица приоритетов
       if (yPos > pageHeight - 50) {

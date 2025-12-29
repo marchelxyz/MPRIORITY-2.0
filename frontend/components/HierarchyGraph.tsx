@@ -23,7 +23,7 @@ function RectangleNode({ data }: { data: { label: string; width?: number; height
       <div
         style={{
           width: `${width}px`,
-          minHeight: `${height}px`,
+          height: `${height}px`,
           backgroundColor: 'white',
           border: '1px solid #000',
           borderRadius: '4px',
@@ -39,15 +39,21 @@ function RectangleNode({ data }: { data: { label: string; width?: number; height
           color: '#111827', // gray-900
           whiteSpace: 'normal', // Разрешаем перенос текста
           lineHeight: '1.3',
+          boxSizing: 'border-box',
         }}
       >
       <Handle type="target" position={Position.Top} style={{ visibility: 'hidden' }} />
       <div style={{ 
-        overflow: 'visible', 
-        maxWidth: '100%',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         wordBreak: 'break-word',
         whiteSpace: 'normal',
         lineHeight: '1.3',
+        hyphens: 'auto',
+        overflowWrap: 'break-word',
       }}>
         {data.label}
       </div>
@@ -65,7 +71,7 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
     const nodes: Node[] = []
     const edges: Edge[] = []
 
-    // Собираем все тексты для вычисления максимального размера
+    // Собираем все тексты для вычисления оптимального размера
     const allTexts: string[] = []
     if (isMultiLevel && levels && levels.length > 0) {
       allTexts.push(goal)
@@ -78,26 +84,53 @@ export default function HierarchyGraph({ goal, criteria, alternatives, levels, i
       alternatives.forEach(a => allTexts.push(a))
     }
 
-    // Вычисляем максимальную длину текста
-    const maxTextLength = Math.max(...allTexts.map(text => text.length))
+    // Вычисляем оптимальную ширину с учетом переноса текста
+    // Базовые параметры
+    const minWidth = 120
+    const maxWidth = 200
+    const fontSize = 12
+    const padding = 16 // 8px с каждой стороны
+    const charWidth = fontSize * 0.6 // Примерная ширина одного символа
+    const availableTextWidth = maxWidth - padding
     
-    // Вычисляем единый размер для всех узлов на основе максимального текста
-    const minWidth = 140
-    const minHeight = 60
-    const maxWidth = 300
-    const maxHeight = 120
+    // Вычисляем ширину для каждого текста с учетом переноса
+    const calculateOptimalWidth = (text: string): number => {
+      const textWidth = text.length * charWidth
+      if (textWidth <= availableTextWidth) {
+        // Текст помещается в одну строку - используем минимальную ширину или ширину текста
+        const optimalWidth = text.length * charWidth + padding
+        return Math.max(minWidth, Math.min(maxWidth, optimalWidth))
+      } else {
+        // Текст нужно переносить - используем максимальную ширину
+        return maxWidth
+      }
+    }
     
-    const unifiedWidth = maxTextLength > 20 
-      ? Math.min(maxWidth, minWidth + (maxTextLength - 20) * 8) 
-      : minWidth
-    const unifiedHeight = maxTextLength > 30 
-      ? Math.min(maxHeight, minHeight + Math.floor((maxTextLength - 30) / 15) * 20) 
-      : minHeight
+    // Находим максимальную ширину среди всех текстов
+    const maxOptimalWidth = Math.max(...allTexts.map(calculateOptimalWidth))
+    const unifiedWidth = Math.max(minWidth, Math.min(maxWidth, maxOptimalWidth))
+    
+    // Вычисляем высоту на основе количества строк текста с учетом единой ширины
+    const lineHeight = fontSize * 1.3
+    const verticalPadding = 16 // 8px сверху и снизу
+    const textAreaWidth = unifiedWidth - padding
+    
+    const calculateHeight = (text: string): number => {
+      // Вычисляем количество символов, которые помещаются в одну строку
+      const charsPerLine = Math.floor(textAreaWidth / charWidth)
+      // Вычисляем количество строк
+      const lines = Math.max(1, Math.ceil(text.length / charsPerLine))
+      // Вычисляем высоту с учетом количества строк
+      const height = lines * lineHeight + verticalPadding
+      return Math.max(60, Math.min(150, height)) // Минимум 60px, максимум 150px
+    }
+    
+    const maxHeight = Math.max(...allTexts.map(calculateHeight))
+    const unifiedHeight = maxHeight
 
-    // Увеличиваем расстояние между узлами, если они большие
-    const baseNodeSpacing = 150
+    // Фиксированное расстояние между узлами по горизонтали
+    const nodeSpacing = 180
     const baseLevelSpacing = 200
-    const nodeSpacing = unifiedWidth > 200 ? baseNodeSpacing + (unifiedWidth - 200) * 0.5 : baseNodeSpacing
     const levelSpacing = unifiedHeight > 80 ? baseLevelSpacing + (unifiedHeight - 80) * 1.5 : baseLevelSpacing
 
     // Сохраняем единый размер в data для использования в компоненте узла
